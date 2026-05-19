@@ -13,7 +13,7 @@ const getApiBaseUrl = () => {
 const API_BASE_URL = getApiBaseUrl();
 
 const originalFetch = window.fetch;
-window.fetch = function (input, init) {
+window.fetch = async function (input, init) {
   if (typeof input === "string" && input.startsWith("/api/")) {
     input = API_BASE_URL + input;
     const method = (init && init.method) || "GET";
@@ -22,7 +22,26 @@ window.fetch = function (input, init) {
       input += separator + "_t=" + new Date().getTime();
     }
   }
-  return originalFetch(input, init);
+
+  const timeoutMs = 15000; // 15 seconds timeout
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+  
+  const modifiedInit = { ...init, signal: controller.signal };
+  
+  try {
+    const response = await originalFetch(input, modifiedInit);
+    clearTimeout(id);
+    return response;
+  } catch (err) {
+    clearTimeout(id);
+    if (err.name === 'AbortError') {
+      console.error(`Fetch timeout for ${input}`);
+      showToast("عذراً، الخادم يستغرق وقتاً طويلاً للرد. يرجى المحاولة لاحقاً.");
+      throw new Error("Request timed out.");
+    }
+    throw err;
+  }
 };
 
 const fallbackImage = "https://via.placeholder.com/400x400?text=No+Image";
@@ -367,6 +386,17 @@ const fetchCategories = async () => {
     return await res.json();
   } catch (err) {
     console.error("Failed to fetch categories:", err);
+    return [];
+  }
+};
+
+const fetchOrders = async (username = null) => {
+  try {
+    const url = username ? `/api/orders?username=${encodeURIComponent(username)}` : "/api/orders";
+    const response = await fetch(url);
+    return response.ok ? await response.json() : [];
+  } catch (err) {
+    console.error("Failed to fetch orders:", err);
     return [];
   }
 };

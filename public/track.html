@@ -12,7 +12,7 @@
     <title>طلباتي | متجر الأب والطفل</title>
     <link rel="stylesheet" href="style.css?v=2" />
     <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide@0.292.0"></script>
   </head>
   <body>
     <nav class="glass" id="mainNav">
@@ -188,8 +188,7 @@ const renderTrackNavActions = () => {
 const renderCustomerOrders = async () => {
   const container = document.getElementById("ordersContainer");
   const user = getLoggedInUser();
-  const orders = await fetchOrders();
-
+  
   if (!container) return;
   if (!user) {
     container.innerHTML = `
@@ -207,41 +206,17 @@ const renderCustomerOrders = async () => {
     return;
   }
 
-  const userEmail = (user.email || "").toLowerCase().trim();
-  const userName = (user.username || "").toLowerCase().trim();
-
-  const userOrders = orders.filter((order) => {
-    const orderEmail = (order.email || "").toLowerCase().trim();
-    const orderName = (order.name || "").toLowerCase().trim();
-    const emailMatch = userEmail && orderEmail === userEmail;
-    const nameMatch = userName && orderName === userName;
-    return emailMatch || nameMatch;
-  });
+  const userOrders = await fetchOrders(user.username);
 
   if (userOrders.length === 0) {
-    if (orders.length > 0) {
-      container.innerHTML = `
-        <div class="glass" style="padding: 40px; border-radius: var(--radius-lg); background: rgba(255,255,255,0.05); margin-bottom: 20px;">
-          <h2>لا توجد طلبات لهذا الحساب</h2>
-          <p style="color: var(--text-muted); margin: 16px 0 0">
-            يوجد ${orders.length} طلباً مخزناً حالياً في الخادم، لكن حسابك الحالي (${user.username || "غير معروف"}) لا يتطابق مع أي منها.
-          </p>
-          <p style="color: var(--text-muted); margin: 16px 0 0; font-size: 0.85rem; direction: ltr;">
-            ملف التعريف: username="${user.username || "?"}" | email="${user.email || "?"}"
-          </p>
-          <p style="color: var(--text-muted); margin: 16px 0 0">
-            إذا أكملت الشراء وتريد رؤية الطلب هنا، سجّل الدخول بنفس الحساب الذي استخدمته عند الشراء.
-          </p>
-        </div>
-      `;
-      return;
-    }
-
     container.innerHTML = `
       <div class="glass" style="padding: 40px; border-radius: var(--radius-lg); background: rgba(255,255,255,0.05);">
         <h2>لم يتم حفظ أي طلب</h2>
         <p style="color: var(--text-muted); margin: 16px 0 0">
           لم يتم العثور على أي طلبات على الخادم حالياً.
+        </p>
+        <p style="color: var(--text-muted); margin: 16px 0 0">
+          إذا أكملت الشراء وتريد رؤية الطلب هنا، سجّل الدخول بنفس الحساب الذي استخدمته عند الشراء.
         </p>
       </div>
     `;

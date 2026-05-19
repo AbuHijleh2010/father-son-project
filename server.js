@@ -14,39 +14,21 @@ const USERS_FILE = path.join(DATA_DIR, "users.json");
 const CATEGORIES_FILE = path.join(DATA_DIR, "categories.json");
 const CARTS_FILE = path.join(DATA_DIR, "carts.json");
 
-// Memory cache in case filesystem is read-only (like on Vercel)
-const memoryDB = {
-  products: null,
-  orders: null,
-  users: null,
-  categories: null,
-  carts: null,
-};
-
 async function readJSONFile(filePath, defaultValue) {
-  const fileName = path.basename(filePath, ".json");
-  if (memoryDB[fileName] !== null) {
-    return memoryDB[fileName];
-  }
   try {
     const data = await fsPromises.readFile(filePath, "utf8");
-    const parsed = JSON.parse(data);
-    memoryDB[fileName] = parsed;
-    return parsed;
+    return JSON.parse(data);
   } catch (err) {
-    memoryDB[fileName] = defaultValue;
     return defaultValue;
   }
 }
 
 async function writeJSONFile(filePath, data) {
-  const fileName = path.basename(filePath, ".json");
-  memoryDB[fileName] = data;
   try {
     await fsPromises.mkdir(DATA_DIR, { recursive: true });
     await fsPromises.writeFile(filePath, JSON.stringify(data, null, 2), "utf8");
   } catch (err) {
-    console.warn(`[Serverless Cache] Failed to write ${fileName} to file system:`, err.message);
+    console.warn(`[File DB] Failed to write to file system:`, err.message);
   }
 }
 
@@ -187,12 +169,8 @@ const DB = {
   // CATEGORIES
   async getCategories() {
     if (usePostgres) {
-      try {
-        const res = await pool.query("SELECT * FROM categories ORDER BY id ASC");
-        return res.rows;
-      } catch (err) {
-        console.error("PostgreSQL getCategories failed, falling back:", err.message);
-      }
+      const res = await pool.query("SELECT * FROM categories ORDER BY id ASC");
+      return res.rows;
     }
     return readJSONFile(CATEGORIES_FILE, [
       { id: 1, name: "تخفيضات", icon: "🔥" },
@@ -206,22 +184,18 @@ const DB = {
 
   async saveCategory(category) {
     if (usePostgres) {
-      try {
-        if (category.id) {
-          const res = await pool.query(
-            "UPDATE categories SET name = $1, icon = $2 WHERE id = $3 RETURNING *",
-            [category.name, category.icon, category.id]
-          );
-          return res.rows[0];
-        } else {
-          const res = await pool.query(
-            "INSERT INTO categories (name, icon) VALUES ($1, $2) RETURNING *",
-            [category.name, category.icon]
-          );
-          return res.rows[0];
-        }
-      } catch (err) {
-        console.error("PostgreSQL saveCategory failed, falling back:", err.message);
+      if (category.id) {
+        const res = await pool.query(
+          "UPDATE categories SET name = $1, icon = $2 WHERE id = $3 RETURNING *",
+          [category.name, category.icon, category.id]
+        );
+        return res.rows[0];
+      } else {
+        const res = await pool.query(
+          "INSERT INTO categories (name, icon) VALUES ($1, $2) RETURNING *",
+          [category.name, category.icon]
+        );
+        return res.rows[0];
       }
     }
     const categories = await this.getCategories();
@@ -241,12 +215,8 @@ const DB = {
 
   async deleteCategory(id) {
     if (usePostgres) {
-      try {
-        const res = await pool.query("DELETE FROM categories WHERE id = $1", [id]);
-        return res.rowCount > 0;
-      } catch (err) {
-        console.error("PostgreSQL deleteCategory failed, falling back:", err.message);
-      }
+      const res = await pool.query("DELETE FROM categories WHERE id = $1", [id]);
+      return res.rowCount > 0;
     }
     const categories = await this.getCategories();
     const filtered = categories.filter((c) => c.id != id);
@@ -257,20 +227,16 @@ const DB = {
   // PRODUCTS
   async getProducts() {
     if (usePostgres) {
-      try {
-        const res = await pool.query("SELECT * FROM products ORDER BY id ASC");
-        return res.rows.map((p) => ({
-          ...p,
-          sizes: p.sizes ? p.sizes.split(",") : [],
-          price: parseFloat(p.price),
-          quantity: parseInt(p.quantity || 0, 10),
-          discount: parseInt(p.discount || 0, 10),
-          match_id: parseInt(p.match_id || 0, 10),
-          category_id: p.category_id ? parseInt(p.category_id, 10) : null,
-        }));
-      } catch (err) {
-        console.error("PostgreSQL getProducts failed, falling back:", err.message);
-      }
+      const res = await pool.query("SELECT * FROM products ORDER BY id ASC");
+      return res.rows.map((p) => ({
+        ...p,
+        sizes: p.sizes ? p.sizes.split(",") : [],
+        price: parseFloat(p.price),
+        quantity: parseInt(p.quantity || 0, 10),
+        discount: parseInt(p.discount || 0, 10),
+        match_id: parseInt(p.match_id || 0, 10),
+        category_id: p.category_id ? parseInt(p.category_id, 10) : null,
+      }));
     }
     return readJSONFile(PRODUCTS_FILE, []);
   },
@@ -278,49 +244,45 @@ const DB = {
   async saveProduct(product) {
     const sizesStr = Array.isArray(product.sizes) ? product.sizes.join(",") : (product.sizes || "");
     if (usePostgres) {
-      try {
-        if (product.id) {
-          const res = await pool.query(
-            `UPDATE products SET title = $1, price = $2, image = $3, type = $4, category_id = $5, 
-             match_id = $6, sizes = $7, description = $8, quantity = $9, discount = $10 WHERE id = $11 RETURNING *`,
-            [
-              product.title,
-              parseFloat(product.price),
-              product.image,
-              product.type,
-              product.category_id ? parseInt(product.category_id, 10) : null,
-              product.match_id ? parseInt(product.match_id, 10) : null,
-              sizesStr,
-              product.description,
-              parseInt(product.quantity || 0, 10),
-              parseInt(product.discount || 0, 10),
-              product.id,
-            ]
-          );
-          const p = res.rows[0];
-          return p ? { ...p, sizes: p.sizes ? p.sizes.split(",") : [] } : null;
-        } else {
-          const res = await pool.query(
-            `INSERT INTO products (title, price, image, type, category_id, match_id, sizes, description, quantity, discount) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
-            [
-              product.title,
-              parseFloat(product.price),
-              product.image,
-              product.type,
-              product.category_id ? parseInt(product.category_id, 10) : null,
-              product.match_id ? parseInt(product.match_id, 10) : null,
-              sizesStr,
-              product.description,
-              parseInt(product.quantity || 0, 10),
-              parseInt(product.discount || 0, 10),
-            ]
-          );
-          const p = res.rows[0];
-          return p ? { ...p, sizes: p.sizes ? p.sizes.split(",") : [] } : null;
-        }
-      } catch (err) {
-        console.error("PostgreSQL saveProduct failed, falling back:", err.message);
+      if (product.id) {
+        const res = await pool.query(
+          `UPDATE products SET title = $1, price = $2, image = $3, type = $4, category_id = $5, 
+           match_id = $6, sizes = $7, description = $8, quantity = $9, discount = $10 WHERE id = $11 RETURNING *`,
+          [
+            product.title,
+            parseFloat(product.price),
+            product.image,
+            product.type,
+            product.category_id ? parseInt(product.category_id, 10) : null,
+            product.match_id ? parseInt(product.match_id, 10) : null,
+            sizesStr,
+            product.description,
+            parseInt(product.quantity || 0, 10),
+            parseInt(product.discount || 0, 10),
+            product.id,
+          ]
+        );
+        const p = res.rows[0];
+        return p ? { ...p, sizes: p.sizes ? p.sizes.split(",") : [] } : null;
+      } else {
+        const res = await pool.query(
+          `INSERT INTO products (title, price, image, type, category_id, match_id, sizes, description, quantity, discount) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+          [
+            product.title,
+            parseFloat(product.price),
+            product.image,
+            product.type,
+            product.category_id ? parseInt(product.category_id, 10) : null,
+            product.match_id ? parseInt(product.match_id, 10) : null,
+            sizesStr,
+            product.description,
+            parseInt(product.quantity || 0, 10),
+            parseInt(product.discount || 0, 10),
+          ]
+        );
+        const p = res.rows[0];
+        return p ? { ...p, sizes: p.sizes ? p.sizes.split(",") : [] } : null;
       }
     }
     const products = await this.getProducts();
@@ -343,12 +305,8 @@ const DB = {
 
   async deleteProduct(id) {
     if (usePostgres) {
-      try {
-        const res = await pool.query("DELETE FROM products WHERE id = $1", [id]);
-        return res.rowCount > 0;
-      } catch (err) {
-        console.error("PostgreSQL deleteProduct failed, falling back:", err.message);
-      }
+      const res = await pool.query("DELETE FROM products WHERE id = $1", [id]);
+      return res.rowCount > 0;
     }
     const products = await this.getProducts();
     const filtered = products.filter((p) => p.id.toString() !== id.toString());
@@ -359,12 +317,8 @@ const DB = {
   // USERS
   async getUsers() {
     if (usePostgres) {
-      try {
-        const res = await pool.query("SELECT * FROM users");
-        return res.rows;
-      } catch (err) {
-        console.error("PostgreSQL getUsers failed, falling back:", err.message);
-      }
+      const res = await pool.query("SELECT * FROM users");
+      return res.rows;
     }
     return readJSONFile(USERS_FILE, [
       { username: "admin", email: "admin@store.com", password: "admin123", role: "admin" }
@@ -373,15 +327,11 @@ const DB = {
 
   async createUser(user) {
     if (usePostgres) {
-      try {
-        const res = await pool.query(
-          "INSERT INTO users (username, email, password, role) VALUES ($1, $2, $3, $4) RETURNING *",
-          [user.username, user.email, user.password, user.role || "user"]
-        );
-        return res.rows[0];
-      } catch (err) {
-        console.error("PostgreSQL createUser failed, falling back:", err.message);
-      }
+      const res = await pool.query(
+        "INSERT INTO users (username, email, password, role) VALUES ($1, $2, $3, $4) RETURNING *",
+        [user.username, user.email, user.password, user.role || "user"]
+      );
+      return res.rows[0];
     }
     const users = await this.getUsers();
     users.push(user);
@@ -390,46 +340,48 @@ const DB = {
   },
 
   // ORDERS
-  async getOrders() {
+  async getOrders(username = null) {
     if (usePostgres) {
-      try {
-        const res = await pool.query("SELECT * FROM orders");
-        return res.rows.map((row) => ({
-          ...row,
-          items: JSON.parse(row.items || "[]"),
-          total: parseFloat(row.total),
-        }));
-      } catch (err) {
-        console.error("PostgreSQL getOrders failed, falling back:", err.message);
+      let query = "SELECT * FROM orders";
+      let params = [];
+      if (username) {
+        query += " WHERE name = $1";
+        params.push(username);
       }
+      const res = await pool.query(query, params);
+      return res.rows.map((row) => ({
+        ...row,
+        items: JSON.parse(row.items || "[]"),
+        total: parseFloat(row.total),
+      }));
     }
-    return readJSONFile(ORDERS_FILE, []);
+    const orders = await readJSONFile(ORDERS_FILE, []);
+    if (username) {
+      return orders.filter(o => o.name === username);
+    }
+    return orders;
   },
 
   async createOrder(order) {
     const itemsStr = JSON.stringify(order.items || []);
     if (usePostgres) {
-      try {
-        const res = await pool.query(
-          `INSERT INTO orders (id, name, email, phone, address, items, status, total, created_at) 
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
-          [
-            order.id,
-            order.name,
-            order.email,
-            order.phone,
-            order.address,
-            itemsStr,
-            order.status,
-            order.total,
-            order.created_at,
-          ]
-        );
-        const o = res.rows[0];
-        return o ? { ...o, items: JSON.parse(o.items || "[]"), total: parseFloat(o.total) } : null;
-      } catch (err) {
-        console.error("PostgreSQL createOrder failed, falling back:", err.message);
-      }
+      const res = await pool.query(
+        `INSERT INTO orders (id, name, email, phone, address, items, status, total, created_at) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+        [
+          order.id,
+          order.name,
+          order.email,
+          order.phone,
+          order.address,
+          itemsStr,
+          order.status,
+          order.total,
+          order.created_at,
+        ]
+      );
+      const o = res.rows[0];
+      return o ? { ...o, items: JSON.parse(o.items || "[]"), total: parseFloat(o.total) } : null;
     }
     const orders = await this.getOrders();
     orders.push(order);
@@ -439,12 +391,8 @@ const DB = {
 
   async updateOrderStatus(id, status) {
     if (usePostgres) {
-      try {
-        const res = await pool.query("UPDATE orders SET status = $1 WHERE id = $2", [status, id]);
-        return res.rowCount > 0;
-      } catch (err) {
-        console.error("PostgreSQL updateOrderStatus failed, falling back:", err.message);
-      }
+      const res = await pool.query("UPDATE orders SET status = $1 WHERE id = $2", [status, id]);
+      return res.rowCount > 0;
     }
     const orders = await this.getOrders();
     const index = orders.findIndex((o) => o.id === id);
@@ -459,12 +407,8 @@ const DB = {
   // CART
   async getCart(username) {
     if (usePostgres) {
-      try {
-        const res = await pool.query("SELECT items FROM cart WHERE username = $1", [username]);
-        return res.rows[0] ? JSON.parse(res.rows[0].items) : [];
-      } catch (err) {
-        console.error("PostgreSQL getCart failed, falling back:", err.message);
-      }
+      const res = await pool.query("SELECT items FROM cart WHERE username = $1", [username]);
+      return res.rows[0] ? JSON.parse(res.rows[0].items) : [];
     }
     const carts = await readJSONFile(CARTS_FILE, {});
     return carts[username] || [];
@@ -473,16 +417,12 @@ const DB = {
   async saveCart(username, items) {
     const itemsStr = JSON.stringify(items);
     if (usePostgres) {
-      try {
-        await pool.query(
-          `INSERT INTO cart (username, items) VALUES ($1, $2) 
-           ON CONFLICT(username) DO UPDATE SET items = EXCLUDED.items`,
-          [username, itemsStr]
-        );
-        return true;
-      } catch (err) {
-        console.error("PostgreSQL saveCart failed, falling back:", err.message);
-      }
+      await pool.query(
+        `INSERT INTO cart (username, items) VALUES ($1, $2) 
+         ON CONFLICT(username) DO UPDATE SET items = EXCLUDED.items`,
+        [username, itemsStr]
+      );
+      return true;
     }
     const carts = await readJSONFile(CARTS_FILE, {});
     carts[username] = items;
@@ -615,8 +555,10 @@ const server = http.createServer(async (req, res) => {
       }
 
       // GET /api/orders
-      if (requestUrl === "/api/orders" && req.method === "GET") {
-        const orders = await DB.getOrders();
+      if (requestUrl.startsWith("/api/orders") && req.method === "GET") {
+        const urlObj = new URL(req.url, `http://${req.headers.host}`);
+        const username = urlObj.searchParams.get("username");
+        const orders = await DB.getOrders(username);
         res.writeHead(200);
         res.end(JSON.stringify(orders));
         return;
@@ -661,21 +603,32 @@ const server = http.createServer(async (req, res) => {
 
       // POST /api/users/signup
       if (requestUrl === "/api/users/signup" && req.method === "POST") {
-        const body = await getRequestBody(req);
-        const users = await DB.getUsers();
-        const exists = users.some((u) => u.username === body.username || u.email === body.email);
-        if (exists) {
-          res.writeHead(400);
-          res.end(JSON.stringify({ error: "اسم المستخدم أو البريد الإلكتروني مسجل بالفعل!" }));
-        } else {
-          const newUser = await DB.createUser({
-            username: body.username,
-            email: body.email,
-            password: body.password,
-            role: "user",
-          });
-          res.writeHead(201);
-          res.end(JSON.stringify({ success: true, user: { username: newUser.username, email: newUser.email } }));
+        try {
+          const body = await getRequestBody(req);
+          const users = await DB.getUsers();
+          const exists = users.some((u) => u.username === body.username || u.email === body.email);
+          if (exists) {
+            res.writeHead(400);
+            res.end(JSON.stringify({ error: "اسم المستخدم أو البريد الإلكتروني مسجل بالفعل!" }));
+          } else {
+            const newUser = await DB.createUser({
+              username: body.username,
+              email: body.email,
+              password: body.password,
+              role: "user",
+            });
+            res.writeHead(201);
+            res.end(JSON.stringify({ success: true, user: { username: newUser.username, email: newUser.email, role: newUser.role } }));
+          }
+        } catch (err) {
+          console.error("Signup error:", err);
+          if (err.code === '23505') { // Postgres unique constraint violation
+            res.writeHead(400);
+            res.end(JSON.stringify({ error: "اسم المستخدم أو البريد الإلكتروني مسجل بالفعل!" }));
+          } else {
+            res.writeHead(500);
+            res.end(JSON.stringify({ error: "حدث خطأ في الخادم" }));
+          }
         }
         return;
       }
@@ -766,9 +719,9 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { "Content-Type": contentType });
     fs.createReadStream(fullPath).pipe(res);
   } catch (error) {
-    console.error(error);
-    res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
-    res.end("Server error");
+    console.error("Server execution error:", error);
+    res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ error: "Server error" }));
   }
 });
 
