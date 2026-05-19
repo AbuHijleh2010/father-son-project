@@ -1,5 +1,25 @@
 // Common variables and utilities shared across pages
 
+// Redirect API calls to local server port 3000 if page is opened from Live Server or file system
+const getApiBaseUrl = () => {
+  const origin = window.location.origin;
+  const protocol = window.location.protocol;
+  const port = window.location.port;
+  if (protocol === "file:" || ((origin.includes("localhost") || origin.includes("127.0.0.1")) && port !== "3000" && port !== "")) {
+    return "http://localhost:3000";
+  }
+  return "";
+};
+const API_BASE_URL = getApiBaseUrl();
+
+const originalFetch = window.fetch;
+window.fetch = function (input, init) {
+  if (typeof input === "string" && input.startsWith("/api/")) {
+    input = API_BASE_URL + input;
+  }
+  return originalFetch(input, init);
+};
+
 const fallbackImage = "https://via.placeholder.com/400x400?text=No+Image";
 let selectedSizes = JSON.parse(localStorage.getItem("selectedSizes") || "{}");
 

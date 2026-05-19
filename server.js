@@ -525,6 +525,18 @@ const server = http.createServer(async (req, res) => {
   try {
     const requestUrl = decodeURIComponent(req.url.split("?")[0]);
 
+    // Set CORS headers for all requests
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+    // Handle CORS preflight options request
+    if (req.method === "OPTIONS") {
+      res.writeHead(204);
+      res.end();
+      return;
+    }
+
     // API Routes
     if (requestUrl.startsWith("/api/")) {
       res.setHeader("Content-Type", "application/json; charset=utf-8");
