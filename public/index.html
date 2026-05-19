@@ -1,240 +1,179 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta
-      http-equiv="Cache-Control"
-      content="no-cache, no-store, must-revalidate"
-    />
-    <meta http-equiv="Pragma" content="no-cache" />
-    <meta http-equiv="Expires" content="0" />
-    <title>متجر الأب والطفل | أناقة تجمع بين الأجيال</title>
-    <link rel="stylesheet" href="style.css?v=2" />
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
-  </head>
-  <body>
-    <!-- Background Blobs -->
-    <div class="blob blob-1"></div>
-    <div class="blob blob-2"></div>
-    <div class="blob blob-3"></div>
 
-    <!-- Loader -->
-    <div class="loader-wrapper" id="loader">
-      <div class="loader"></div>
-    </div>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>متجر الأب والطفل | أناقة تجمع بين الأجيال</title>
+  <link rel="stylesheet" href="style.css?v=2" />
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+</head>
 
-    <!-- Toast Notification -->
-    <div id="toast" class="toast"></div>
+<body>
+  <!-- Background Blobs -->
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
 
-    <!-- Navigation -->
-    <nav class="glass" id="mainNav">
-      <div class="nav-container">
-        <a href="index.html" class="logo">
-          <i data-lucide="sparkles" style="color: var(--secondary)"></i>
-          <span>متجر الأب والطفل</span>
-        </a>
+  <!-- Loader -->
+  <div class="loader-wrapper" id="loader">
+    <div class="loader"></div>
+  </div>
 
-        <div class="search-container">
-          <input
-            type="text"
-            id="searchInput"
-            class="search-input"
-            placeholder="ابحث عن أناقتك القادمة..."
-          />
-        </div>
+  <!-- Toast Notification -->
+  <div id="toast" class="toast"></div>
 
-        <div class="nav-actions">
-          <a href="track.html" class="nav-icon" title="تتبع طلبك"
-            ><i data-lucide="package"></i
-          ></a>
-          <a href="login.html" class="nav-icon" title="تسجيل دخول"
-            ><i data-lucide="log-in"></i
-          ></a>
-          <a href="signup.html" class="nav-icon" title="إنشاء حساب"
-            ><i data-lucide="user-plus"></i
-          ></a>
-          <button
-            class="nav-icon"
-            title="بحث"
-            onclick="document.getElementById('searchInput').focus()"
-          >
-            <i data-lucide="search"></i>
-          </button>
-          <button
-            class="nav-icon"
-            title="السلة"
-            style="position: relative"
-            id="cartBtn"
-          >
-            <i data-lucide="shopping-cart"></i>
-            <span id="cartCount" class="cart-badge" style="display: none"
-              >0</span
-            >
-          </button>
-          <a href="admin.html" class="nav-icon" title="لوحة التحكم"
-            ><i data-lucide="lock"></i
-          ></a>
-        </div>
+  <!-- Navigation -->
+  <nav class="glass" id="mainNav">
+    <div class="nav-container">
+      <a href="index.html" class="logo">
+        <i data-lucide="sparkles" style="color: var(--secondary)"></i>
+        <span>متجر الأب والطفل</span>
+      </a>
+
+      <div class="search-container">
+        <input type="text" id="searchInput" class="search-input" placeholder="ابحث عن أناقتك القادمة..." />
       </div>
-    </nav>
 
-    <main class="container" style="padding-top: 110px">
-      <!-- Hero Section -->
-      <section class="hero glass">
-        <div class="hero-content">
-          <span class="hero-tag">تشكيلة صيف 2026</span>
-          <h1 class="hero-title">أناقة تليق بك وبطفلك</h1>
-          <p
-            style="
+      <div class="nav-actions">
+        <a href="track.html" class="nav-icon" title="تتبع طلبك"><i data-lucide="package"></i></a>
+        <a href="login.html" class="nav-icon" title="تسجيل دخول"><i data-lucide="log-in"></i></a>
+        <a href="signup.html" class="nav-icon" title="إنشاء حساب"><i data-lucide="user-plus"></i></a>
+        <button class="nav-icon" title="بحث" onclick="document.getElementById('searchInput').focus()">
+          <i data-lucide="search"></i>
+        </button>
+        <button class="nav-icon" title="السلة" style="position: relative" id="cartBtn">
+          <i data-lucide="shopping-cart"></i>
+          <span id="cartCount" class="cart-badge" style="display: none">0</span>
+        </button>
+        <a href="admin.html" class="nav-icon" title="لوحة التحكم"><i data-lucide="lock"></i></a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="container" style="padding-top: 110px">
+    <!-- Hero Section -->
+    <section class="hero glass">
+      <div class="hero-content">
+        <span class="hero-tag">تشكيلة صيف 2026</span>
+        <h1 class="hero-title">أناقة تليق بك وبطفلك</h1>
+        <p style="
               color: var(--text-muted);
               margin-bottom: 35px;
               font-size: 1.15rem;
               max-width: 500px;
-            "
-          >
-            اكتشف أرقى التشكيلات المصممة خصيصاً لتجمع بين فخامة الأب وبراءة
-            الطفل في إطلالة واحدة متناغمة.
-          </p>
-          <div>
-            <button class="hero-btn" onclick="scrollToProducts()">
-              ابدأ التسوق الآن
-              <i
-                data-lucide="arrow-left"
-                style="margin-right: 10px; vertical-align: middle"
-              ></i>
-            </button>
-          </div>
-        </div>
-        <div class="hero-overlay"></div>
-        <img
-          src="https://images.unsplash.com/photo-1490138139357-fc819d02e344?w=1200"
-          class="hero-image"
-          alt="Hero"
-        />
-      </section>
-
-      <!-- Categories -->
-      <section>
-        <div class="section-header">
-          <h2>تسوق حسب الفئة</h2>
-          <a
-            href="shop.html"
-            style="
-              color: var(--primary);
-              font-weight: bold;
-              text-decoration: none;
-            "
-            >عرض الكل ←</a
-          >
-        </div>
-        <div class="categories-grid" id="categoriesContainer">
-          <!-- Categories will be injected here -->
-        </div>
-      </section>
-
-      <!-- Products -->
-      <section id="productsSection" style="margin-top: 40px">
-        <div class="section-header">
-          <h2>الأكثر مبيعاً لهذا الأسبوع</h2>
-        </div>
-        <div class="products-grid" id="productsContainer">
-          <!-- Products will be injected here -->
-        </div>
-      </section>
-    </main>
-
-    <!-- Cart Sidebar -->
-    <div id="cartOverlay" class="cart-overlay">
-      <div class="cart-sidebar">
-        <div class="cart-header">
-          <h2>سلة المشتريات</h2>
-          <button class="close-btn" id="closeCart">&times;</button>
-        </div>
-        <div class="cart-content" id="cartContent">
-          <!-- Cart items will be injected here -->
-        </div>
-        <div class="cart-footer" id="cartFooter" style="display: none">
-          <div style="margin-bottom: 18px; text-align: right">
-            <label
-              for="checkoutAddress"
-              style="display: block; margin-bottom: 8px; font-weight: 700"
-              >عنوان التوصيل</label
-            >
-            <textarea
-              id="checkoutAddress"
-              class="input-field"
-              rows="3"
-              placeholder="اكتب العنوان الكامل ثم اضغط إتمام الشراء"
-              style="width: 100%; resize: vertical"
-            ></textarea>
-            <p
-              id="checkoutAddressError"
-              style="
-                color: #ef4444;
-                margin-top: 6px;
-                display: none;
-                font-size: 0.95rem;
-              "
-            >
-              الرجاء إدخال عنوان التوصيل.
-            </p>
-          </div>
-          <div style="margin-bottom: 18px; text-align: right">
-            <label
-              for="checkoutPhone"
-              style="display: block; margin-bottom: 8px; font-weight: 700"
-              >رقم الجوال</label
-            >
-            <input
-              id="checkoutPhone"
-              class="input-field"
-              type="tel"
-              placeholder="مثال: 009627XXXXXXXX"
-              style="width: 100%"
-            />
-            <p
-              id="checkoutPhoneError"
-              style="
-                color: #ef4444;
-                margin-top: 6px;
-                display: none;
-                font-size: 0.95rem;
-              "
-            >
-              الرجاء إدخال رقم جوال صالح.
-            </p>
-          </div>
-          <div class="total-section">
-            <span>المجموع:</span>
-            <span id="cartTotal">0$</span>
-          </div>
-          <button class="checkout-btn" onclick="checkoutCart(event)">
-            إتمام الشراء الآن
+            ">
+          اكتشف أرقى التشكيلات المصممة خصيصاً لتجمع بين فخامة الأب وبراءة
+          الطفل في إطلالة واحدة متناغمة.
+        </p>
+        <div>
+          <button class="hero-btn" onclick="scrollToProducts()">
+            ابدأ التسوق الآن
+            <i data-lucide="arrow-left" style="margin-right: 10px; vertical-align: middle"></i>
           </button>
         </div>
       </div>
-    </div>
+      <div class="hero-overlay"></div>
+      <img src="https://images.unsplash.com/photo-1490138139357-fc819d02e344?w=1200" class="hero-image" alt="Hero" />
+    </section>
 
-    <footer>
-      <div class="container">
-        <div class="logo" style="justify-content: center; margin-bottom: 20px">
-          <span>👨‍👦</span>
-          <span>متجر الأب والطفل</span>
-        </div>
-        <p style="color: var(--text-dim); max-width: 600px; margin: 0 auto">
-          نحن نؤمن بأن الأناقة تبدأ من الصغر، وأن العلاقة بين الأب والطفل تستحق
-          أن تظهر في أجمل حلة.
-        </p>
-        <p style="color: var(--text-dim); margin-top: 30px">
-          © 2026 جميع الحقوق محفوظة.
-        </p>
+    <!-- Categories -->
+    <section>
+      <div class="section-header">
+        <h2>تسوق حسب الفئة</h2>
+        <a href="shop.html" style="
+              color: var(--primary);
+              font-weight: bold;
+              text-decoration: none;
+            ">عرض الكل ←</a>
       </div>
-    </footer>
+      <div class="categories-grid" id="categoriesContainer">
+        <!-- Categories will be injected here -->
+      </div>
+    </section>
 
-    <script src="script.js?v=5"></script>
-    <script>
+    <!-- Products -->
+    <section id="productsSection" style="margin-top: 40px">
+      <div class="section-header">
+        <h2>الأكثر مبيعاً لهذا الأسبوع</h2>
+      </div>
+      <div class="products-grid" id="productsContainer">
+        <!-- Products will be injected here -->
+      </div>
+    </section>
+  </main>
+
+  <!-- Cart Sidebar -->
+  <div id="cartOverlay" class="cart-overlay">
+    <div class="cart-sidebar">
+      <div class="cart-header">
+        <h2>سلة المشتريات</h2>
+        <button class="close-btn" id="closeCart">&times;</button>
+      </div>
+      <div class="cart-content" id="cartContent">
+        <!-- Cart items will be injected here -->
+      </div>
+      <div class="cart-footer" id="cartFooter" style="display: none">
+        <div style="margin-bottom: 18px; text-align: right">
+          <label for="checkoutAddress" style="display: block; margin-bottom: 8px; font-weight: 700">عنوان
+            التوصيل</label>
+          <textarea id="checkoutAddress" class="input-field" rows="3"
+            placeholder="اكتب العنوان الكامل ثم اضغط إتمام الشراء" style="width: 100%; resize: vertical"></textarea>
+          <p id="checkoutAddressError" style="
+                color: #ef4444;
+                margin-top: 6px;
+                display: none;
+                font-size: 0.95rem;
+              ">
+            الرجاء إدخال عنوان التوصيل.
+          </p>
+        </div>
+        <div style="margin-bottom: 18px; text-align: right">
+          <label for="checkoutPhone" style="display: block; margin-bottom: 8px; font-weight: 700">رقم الجوال</label>
+          <input id="checkoutPhone" class="input-field" type="tel" placeholder="مثال: 009627XXXXXXXX"
+            style="width: 100%" />
+          <p id="checkoutPhoneError" style="
+                color: #ef4444;
+                margin-top: 6px;
+                display: none;
+                font-size: 0.95rem;
+              ">
+            الرجاء إدخال رقم جوال صالح.
+          </p>
+        </div>
+        <div class="total-section">
+          <span>المجموع:</span>
+          <span id="cartTotal">0$</span>
+        </div>
+        <button class="checkout-btn" onclick="checkoutCart(event)">
+          إتمام الشراء الآن
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="container">
+      <div class="logo" style="justify-content: center; margin-bottom: 20px">
+        <span>👨‍👦</span>
+        <span>متجر الأب والطفل</span>
+      </div>
+      <p style="color: var(--text-dim); max-width: 600px; margin: 0 auto">
+        نحن نؤمن بأن الأناقة تبدأ من الصغر، وأن العلاقة بين الأب والطفل تستحق
+        أن تظهر في أجمل حلة.
+      </p>
+      <p style="color: var(--text-dim); margin-top: 30px">
+        © 2026 جميع الحقوق محفوظة.
+      </p>
+    </div>
+  </footer>
+
+  <script src="script.js?v=5"></script>
+  <script>
 // Specific logic for the Home page (index.html)
 
 let selectedCategory = null;
@@ -383,7 +322,7 @@ document.addEventListener("DOMContentLoaded", () => {
 window.handleCategoryClick = handleCategoryClick;
 window.handleCardGlow = handleCardGlow;
 window.handleSizeSelect = handleSizeSelect;
+  </script>
+</body>
 
-    </script>
-  </body>
 </html>

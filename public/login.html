@@ -89,83 +89,99 @@
         </div>
       </div>
     </main>
+    <script src="script.js?v=5"></script>
     <script>
-      const setLoadingButton = (button, text) => {
-        if (!button) return;
-        if (!button.dataset.originalText) {
-          button.dataset.originalText = button.innerHTML;
-        }
-        button.disabled = true;
-        button.classList.add("loading");
-        button.innerHTML = text;
-      };
+// Specific logic for Login page (login.html)
 
-      const resetLoadingButton = (button) => {
-        if (!button) return;
-        button.disabled = false;
-        button.classList.remove("loading");
-        if (button.dataset.originalText) {
-          button.innerHTML = button.dataset.originalText;
-        }
-      };
+const setLoadingButton = (button, text) => {
+  if (!button) return;
+  if (!button.dataset.originalText) {
+    button.dataset.originalText = button.innerHTML;
+  }
+  button.disabled = true;
+  button.classList.add("loading");
+  button.innerHTML = text;
+};
 
-      document.addEventListener("DOMContentLoaded", () => {
-        const emailInput = document.getElementById("loginEmail");
-        const usernameInput = document.getElementById("loginUsername");
-        const passwordInput = document.getElementById("loginPassword");
-        emailInput.value = "";
-        usernameInput.value = "";
-        passwordInput.value = "";
-        emailInput.autocomplete = "email";
-        usernameInput.autocomplete = "username";
-        passwordInput.autocomplete = "new-password";
-      });
+const resetLoadingButton = (button) => {
+  if (!button) return;
+  button.disabled = false;
+  button.classList.remove("loading");
+  if (button.dataset.originalText) {
+    button.innerHTML = button.dataset.originalText;
+  }
+};
 
-      const loginForm = document.getElementById("loginForm");
-      loginForm.addEventListener("submit", (e) => {
-        e.preventDefault();
-        const submitButton = loginForm.querySelector('button[type="submit"]');
-        setLoadingButton(submitButton, "جاري تسجيل الدخول...");
+document.addEventListener("DOMContentLoaded", () => {
+  const emailInput = document.getElementById("loginEmail");
+  const usernameInput = document.getElementById("loginUsername");
+  const passwordInput = document.getElementById("loginPassword");
+  if (emailInput) emailInput.value = "";
+  if (usernameInput) usernameInput.value = "";
+  if (passwordInput) passwordInput.value = "";
+  if (emailInput) emailInput.autocomplete = "email";
+  if (usernameInput) usernameInput.autocomplete = "username";
+  if (passwordInput) passwordInput.autocomplete = "new-password";
 
-        const email = document.getElementById("loginEmail").value.trim();
-        const username = document.getElementById("loginUsername").value.trim();
-        const password = document.getElementById("loginPassword").value.trim();
-        if (!username || !password) {
-          resetLoadingButton(submitButton);
-          return;
-        }
+  const loginForm = document.getElementById("loginForm");
+  if (loginForm) {
+    loginForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const submitButton = loginForm.querySelector('button[type="submit"]');
+      setLoadingButton(submitButton, "جاري تسجيل الدخول...");
 
-        const users = JSON.parse(localStorage.getItem("shopUsers") || "[]");
-        const user = users.find(
-          (u) =>
-            ((email && u.email === email) ||
-              (username && u.username === username)) &&
-            u.password === password,
-        );
-        const message = document.getElementById("loginMessage");
+      const email = document.getElementById("loginEmail")?.value.trim() || "";
+      const username = document.getElementById("loginUsername")?.value.trim() || "";
+      const password = document.getElementById("loginPassword")?.value.trim() || "";
+      const message = document.getElementById("loginMessage");
 
-        if (user) {
-          localStorage.setItem(
-            "shopUser",
-            JSON.stringify({
-              username: user.username,
-              email: user.email || "",
-            }),
-          );
-          message.innerText = "تم تسجيل الدخول بنجاح. جارٍ التحويل...";
-          message.style.color = "var(--secondary)";
-          message.style.display = "block";
+      if (!username || !password) {
+        resetLoadingButton(submitButton);
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/users/login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ username, email, password }),
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+          localStorage.setItem("shopUser", JSON.stringify(result.user));
+          if (message) {
+            message.innerText = "تم تسجيل الدخول بنجاح. جارٍ التحويل...";
+            message.style.color = "var(--secondary)";
+            message.style.display = "block";
+          }
           setTimeout(() => {
             resetLoadingButton(submitButton);
             window.location.href = "account.html";
           }, 900);
         } else {
-          message.innerText = "اسم المستخدم أو كلمة المرور غير صحيحة.";
-          message.style.color = "#ef4444";
-          message.style.display = "block";
+          if (message) {
+            message.innerText = result.error || "اسم المستخدم أو كلمة المرور غير صحيحة.";
+            message.style.color = "#ef4444";
+            message.style.display = "block";
+          }
           resetLoadingButton(submitButton);
         }
-      });
+      } catch (err) {
+        console.error("Login request failed:", err);
+        if (message) {
+          message.innerText = "حدث خطأ أثناء الاتصال بالخادم. يرجى المحاولة لاحقاً.";
+          message.style.color = "#ef4444";
+          message.style.display = "block";
+        }
+        resetLoadingButton(submitButton);
+      }
+    });
+  }
+});
     </script>
   </body>
 </html>

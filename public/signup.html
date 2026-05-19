@@ -114,85 +114,107 @@
         </section>
       </div>
     </main>
+    <script src="script.js?v=5"></script>
     <script>
-      const setLoadingButton = (button, text) => {
-        if (!button) return;
-        if (!button.dataset.originalText) {
-          button.dataset.originalText = button.innerHTML;
-        }
-        button.disabled = true;
-        button.classList.add("loading");
-        button.innerHTML = text;
-      };
+// Specific logic for Signup page (signup.html)
 
-      const resetLoadingButton = (button) => {
-        if (!button) return;
-        button.disabled = false;
-        button.classList.remove("loading");
-        if (button.dataset.originalText) {
-          button.innerHTML = button.dataset.originalText;
-        }
-      };
+const setLoadingButton = (button, text) => {
+  if (!button) return;
+  if (!button.dataset.originalText) {
+    button.dataset.originalText = button.innerHTML;
+  }
+  button.disabled = true;
+  button.classList.add("loading");
+  button.innerHTML = text;
+};
 
-      document.addEventListener("DOMContentLoaded", () => {
-        const usernameInput = document.getElementById("signupUsername");
-        const passwordInput = document.getElementById("signupPassword");
-        usernameInput.value = "";
-        passwordInput.value = "";
-        usernameInput.autocomplete = "off";
-        passwordInput.autocomplete = "new-password";
-      });
+const resetLoadingButton = (button) => {
+  if (!button) return;
+  button.disabled = false;
+  button.classList.remove("loading");
+  if (button.dataset.originalText) {
+    button.innerHTML = button.dataset.originalText;
+  }
+};
 
-      const signupForm = document.getElementById("signupForm");
-      signupForm.addEventListener("submit", (e) => {
-        e.preventDefault();
-        const submitButton = signupForm.querySelector('button[type="submit"]');
-        setLoadingButton(submitButton, "جاري إنشاء الحساب...");
+document.addEventListener("DOMContentLoaded", () => {
+  const usernameInput = document.getElementById("signupUsername");
+  const passwordInput = document.getElementById("signupPassword");
+  if (usernameInput) usernameInput.value = "";
+  if (passwordInput) passwordInput.value = "";
+  if (usernameInput) usernameInput.autocomplete = "off";
+  if (passwordInput) passwordInput.autocomplete = "new-password";
 
-        const username = document.getElementById("signupUsername").value.trim();
-        const email = document.getElementById("signupEmail").value.trim();
-        const password = document.getElementById("signupPassword").value.trim();
-        const message = document.getElementById("signupMessage");
+  const signupForm = document.getElementById("signupForm");
+  if (signupForm) {
+    signupForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const submitButton = signupForm.querySelector('button[type="submit"]');
+      setLoadingButton(submitButton, "جاري إنشاء الحساب...");
 
-        if (!username || !email || !password) {
-          resetLoadingButton(submitButton);
-          return;
-        }
+      const username = document.getElementById("signupUsername")?.value.trim() || "";
+      const email = document.getElementById("signupEmail")?.value.trim() || "";
+      const password = document.getElementById("signupPassword")?.value.trim() || "";
+      const message = document.getElementById("signupMessage");
 
-        const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailPattern.test(email)) {
+      if (!username || !email || !password) {
+        resetLoadingButton(submitButton);
+        return;
+      }
+
+      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailPattern.test(email)) {
+        if (message) {
           message.innerText = "الرجاء إدخال بريد إلكتروني صالح.";
           message.style.color = "#ef4444";
           message.style.display = "block";
-          resetLoadingButton(submitButton);
-          return;
         }
+        resetLoadingButton(submitButton);
+        return;
+      }
 
-        const users = JSON.parse(localStorage.getItem("shopUsers") || "[]");
-        const exists = users.some(
-          (u) => u.username === username || u.email === email,
-        );
+      try {
+        const response = await fetch("/api/users/signup", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ username, email, password }),
+        });
 
-        if (exists) {
-          message.innerText =
-            "اسم المستخدم أو البريد الإلكتروني مستخدم سابقاً، اختر بيانات أخرى.";
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+          localStorage.setItem("shopUser", JSON.stringify(result.user));
+          if (message) {
+            message.innerText = "تم إنشاء الحساب بنجاح. جارٍ التحويل...";
+            message.style.color = "var(--secondary)";
+            message.style.display = "block";
+          }
+          setTimeout(() => {
+            resetLoadingButton(submitButton);
+            window.location.href = "account.html";
+          }, 900);
+        } else {
+          if (message) {
+            message.innerText = result.error || "اسم المستخدم أو البريد الإلكتروني مستخدم سابقاً، اختر بيانات أخرى.";
+            message.style.color = "#ef4444";
+            message.style.display = "block";
+          }
+          resetLoadingButton(submitButton);
+        }
+      } catch (err) {
+        console.error("Signup request failed:", err);
+        if (message) {
+          message.innerText = "حدث خطأ أثناء الاتصال بالخادم. يرجى المحاولة لاحقاً.";
           message.style.color = "#ef4444";
           message.style.display = "block";
-          resetLoadingButton(submitButton);
-          return;
         }
-
-        users.push({ username, email, password });
-        localStorage.setItem("shopUsers", JSON.stringify(users));
-        localStorage.setItem("shopUser", JSON.stringify({ username, email }));
-        message.innerText = "تم إنشاء الحساب بنجاح. جارٍ التحويل...";
-        message.style.color = "var(--secondary)";
-        message.style.display = "block";
-        setTimeout(() => {
-          resetLoadingButton(submitButton);
-          window.location.href = "account.html";
-        }, 900);
-      });
+        resetLoadingButton(submitButton);
+      }
+    });
+  }
+});
     </script>
   </body>
 </html>
