@@ -554,7 +554,7 @@ const checkoutCart = async (event) => {
   }));
 
   const total = cartItems.reduce(
-    (acc, item) => acc + item.price * (item.quantity || 1),
+    (acc, item) => acc + Number(item.price || 0) * (item.quantity || 1),
     0,
   );
   const orderId = `TRK-${Math.floor(1000 + Math.random() * 9000)}`;
@@ -576,7 +576,14 @@ const checkoutCart = async (event) => {
     });
 
     if (response.ok) {
+      // Clear local cart completely
       saveCartItems([]);
+      // Ensure the server actually processes the clearing before we navigate away
+      await fetch("/api/cart", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: user.username, items: [] }),
+      });
       if (addressInput) addressInput.value = "";
       if (phoneInput) phoneInput.value = "";
       localStorage.setItem("cartCount", "0");

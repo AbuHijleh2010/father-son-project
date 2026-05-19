@@ -626,7 +626,7 @@ const server = http.createServer(async (req, res) => {
           res.writeHead(success ? 200 : 404);
           res.end(JSON.stringify({ success }));
         } else {
-          const orderId = `TRK-${Math.floor(1000 + Math.random() * 9000)}`;
+          const orderId = body.id || `TRK-${Math.floor(1000 + Math.random() * 9000)}`;
           const newOrder = {
             ...body,
             id: orderId,
