@@ -1132,10 +1132,10 @@ th { color: var(--text-muted); }
 
 /* Small Tablets / Large Phones (max-width: 768px) */
 @media (max-width: 768px) {
-  /* Navbar responsiveness */
+  /* Navbar responsiveness - Stacking elements instead of hiding them */
   nav {
     height: auto !important;
-    padding: 12px 16px !important;
+    padding: 15px 12px !important;
     position: sticky !important; /* Becomes sticky on mobile to avoid overlapping */
     top: 0;
   }
@@ -1146,24 +1146,43 @@ th { color: var(--text-muted); }
   }
   
   .nav-container {
-    flex-wrap: wrap;
-    gap: 10px;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 12px;
+  }
+
+  .logo {
+    font-size: 24px;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .logo span {
+    display: inline !important; /* Never hide the logo text */
+    font-size: 22px;
   }
   
   /* Place the search container in its own full-width row below Logo and Actions */
   .search-container {
     flex: 0 0 100%;
+    width: 100%;
     order: 3;
-    margin: 6px 0 0 0;
+    margin: 5px 0 0 0;
   }
   
   .search-input {
     padding: 10px 18px;
     font-size: 14px;
+    text-align: center;
   }
   
   .nav-actions {
-    gap: 6px;
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap; /* Ensure all icons wrap gracefully if there are many */
+    gap: 8px;
+    order: 2;
   }
   
   .nav-icon {
@@ -1296,22 +1315,16 @@ th { color: var(--text-muted); }
 /* Extra Small Phones (max-width: 420px) */
 @media (max-width: 420px) {
   .logo span {
-    display: none; /* Hide full text to prevent overlap */
-  }
-  
-  .logo::after {
-    content: 'الأب والطفل'; /* Shorter text for tiny screens */
-    font-size: 16px;
-    font-weight: 900;
+    font-size: 18px !important; /* Keep full text but slightly smaller */
   }
   
   .nav-actions {
-    gap: 4px;
+    gap: 6px;
   }
   
   .nav-icon {
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
     border-radius: 8px;
     font-size: 13px;
   }
