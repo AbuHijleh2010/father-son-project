@@ -153,6 +153,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (response.ok && result.success) {
           localStorage.setItem("shopUser", JSON.stringify(result.user));
+          if (typeof fetchAndMergeCart === "function") {
+            await fetchAndMergeCart();
+          }
           if (message) {
             message.innerText = "تم تسجيل الدخول بنجاح. جارٍ التحويل...";
             message.style.color = "var(--secondary)";

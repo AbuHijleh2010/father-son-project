@@ -183,6 +183,41 @@
           </table>
         </div>
 
+        <!-- Categories Management Section -->
+        <div
+          class="glass"
+          style="
+            padding: 30px;
+            border-radius: var(--radius-lg);
+            margin: 40px 0;
+          "
+        >
+          <h3>📁 إدارة أقسام المتجر</h3>
+          <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-top: 20px;">
+            <!-- Category Form -->
+            <div style="flex: 1; min-width: 250px;">
+              <h4 style="margin-bottom: 12px;">إضافة قسم جديد</h4>
+              <div class="field-group" style="margin-bottom: 12px;">
+                <label for="catName">اسم القسم</label>
+                <input id="catName" class="input-field" placeholder="مثال: بلايز، أحذية" />
+              </div>
+              <div class="field-group" style="margin-bottom: 15px;">
+                <label for="catIcon">أيقونة القسم (إيموجي)</label>
+                <input id="catIcon" class="input-field" placeholder="مثال: 👕، 👟" />
+              </div>
+              <button class="hero-btn" onclick="saveCategory()" style="width: 100%;">إضافة القسم</button>
+            </div>
+            
+            <!-- Category List -->
+            <div style="flex: 2; min-width: 300px; border-right: 1px solid rgba(255,255,255,0.1); padding-right: 20px;">
+              <h4 style="margin-bottom: 12px;">الأقسام الحالية</h4>
+              <div id="adminCategoriesList" style="display: flex; flex-direction: column; gap: 10px; max-height: 250px; overflow-y: auto; padding-left: 10px;">
+                <!-- Categories will be loaded here -->
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div
           class="glass"
           style="padding: 30px; border-radius: var(--radius-lg); margin: 40px 0"
@@ -255,6 +290,12 @@
               <select id="pType" class="input-field">
                 <option value="father">أب</option>
                 <option value="child">طفل</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label for="pCategory">قسم المنتج</label>
+              <select id="pCategory" class="input-field">
+                <!-- Loaded dynamically -->
               </select>
             </div>
             <div class="field-group">
@@ -388,7 +429,7 @@ const setAdminNavButton = (isLoggedIn) => {
   if (typeof lucide !== "undefined") lucide.createIcons();
 };
 
-function login() {
+async function login() {
   const pass = document.getElementById("adminPassword").value;
   const errorEl = document.getElementById("loginError");
   if (errorEl) {
@@ -396,11 +437,30 @@ function login() {
     errorEl.innerText = "كلمة المرور غير صحيحة!";
   }
 
-  if (pass === "admin123") {
-    localStorage.setItem("admin_auth", "true");
-    window.location.href = "admin.html";
-  } else {
-    if (errorEl) errorEl.style.display = "block";
+  try {
+    const response = await fetch("/api/users/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: "admin", password: pass }),
+    });
+    const result = await response.json();
+    if (response.ok && result.success && result.user.role === "admin") {
+      localStorage.setItem("admin_auth", "true");
+      window.location.href = "admin.html";
+    } else {
+      if (errorEl) {
+        errorEl.innerText = result.error || "كلمة المرور غير صحيحة!";
+        errorEl.style.display = "block";
+      }
+    }
+  } catch (err) {
+    console.error("Backend admin login failed, attempting local fallback:", err);
+    if (pass === "admin123") {
+      localStorage.setItem("admin_auth", "true");
+      window.location.href = "admin.html";
+    } else {
+      if (errorEl) errorEl.style.display = "block";
+    }
   }
 }
 
@@ -413,10 +473,98 @@ function showDashboard() {
   try {
     renderAdminProducts();
     renderAdminOrders();
+    renderAdminCategories();
   } catch (error) {
     console.error("Dashboard render failed:", error);
   }
 }
+
+// Categories Management Functions
+const renderAdminCategories = async () => {
+  const listContainer = document.getElementById("adminCategoriesList");
+  const categorySelect = document.getElementById("pCategory");
+  if (!listContainer && !categorySelect) return;
+
+  try {
+    const response = await fetch("/api/categories");
+    const categories = await response.json();
+
+    if (listContainer) {
+      if (categories.length === 0) {
+        listContainer.innerHTML = `<div style="color: var(--text-muted); text-align: center; padding: 10px;">لا توجد أقسام حالياً.</div>`;
+      } else {
+        listContainer.innerHTML = categories
+          .map(
+            (cat) => `
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; background: rgba(255,255,255,0.05); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08);">
+              <span style="font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                <span>${cat.icon}</span>
+                <span>${cat.name}</span>
+              </span>
+              <button onclick="deleteCategory(${cat.id})" style="color: #ef4444; background: none; border: none; cursor: pointer; font-size: 14px; font-weight: bold;">حذف</button>
+            </div>
+          `
+          )
+          .join("");
+      }
+    }
+
+    if (categorySelect) {
+      categorySelect.innerHTML = categories
+        .map((cat) => `<option value="${cat.id}">${cat.icon} ${cat.name}</option>`)
+        .join("");
+    }
+  } catch (err) {
+    console.error("Failed to render categories:", err);
+  }
+};
+
+const saveCategory = async () => {
+  const nameInput = document.getElementById("catName");
+  const iconInput = document.getElementById("catIcon");
+  const name = nameInput?.value.trim();
+  const icon = iconInput?.value.trim() || "📁";
+
+  if (!name) {
+    return alert("يرجى إدخال اسم القسم");
+  }
+
+  try {
+    const response = await fetch("/api/categories", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, icon }),
+    });
+
+    if (response.ok) {
+      if (nameInput) nameInput.value = "";
+      if (iconInput) iconInput.value = "";
+      renderAdminCategories();
+      alert("تمت إضافة القسم بنجاح!");
+    } else {
+      alert("فشل في حفظ القسم");
+    }
+  } catch (err) {
+    console.error("Failed to save category:", err);
+    alert("فشل الاتصال بالخادم");
+  }
+};
+
+const deleteCategory = async (id) => {
+  if (!confirm("هل أنت متأكد من حذف هذا القسم؟ قد يؤثر ذلك على المنتجات التابعة له.")) return;
+  try {
+    const response = await fetch(`/api/categories?id=${id}`, {
+      method: "DELETE",
+    });
+    if (response.ok) {
+      renderAdminCategories();
+    } else {
+      alert("فشل حذف القسم");
+    }
+  } catch (err) {
+    console.error("Failed to delete category:", err);
+  }
+};
 
 const renderAdminProducts = async () => {
   const body = document.getElementById("adminProductsBody");
@@ -631,6 +779,7 @@ const populateProductForm = async (id) => {
   document.getElementById("pPrice").value = product.price || "";
   document.getElementById("pImage").value = product.image || "";
   document.getElementById("pType").value = product.type || "father";
+  document.getElementById("pCategory").value = product.category_id || "";
   document.getElementById("pMatch").value = product.match_id || "";
   document.getElementById("pSizes").value = Array.isArray(product.sizes)
     ? product.sizes.join(",")
@@ -655,6 +804,7 @@ const cancelEdit = () => {
   document.getElementById("pPrice").value = "";
   document.getElementById("pImage").value = "";
   document.getElementById("pType").value = "father";
+  document.getElementById("pCategory").value = "";
   document.getElementById("pMatch").value = "";
   document.getElementById("pSizes").value = "";
   document.getElementById("pQuantity").value = "0";
@@ -673,6 +823,7 @@ const addProduct = async () => {
   const price = parseFloat(document.getElementById("pPrice")?.value || "0");
   const image = document.getElementById("pImage")?.value;
   const type = document.getElementById("pType")?.value;
+  const category_id = parseInt(document.getElementById("pCategory")?.value || "2", 10);
   const match_id = parseInt(document.getElementById("pMatch")?.value || "0", 10);
   const description = document.getElementById("pDesc")?.value;
   const sizesInput = document.getElementById("pSizes")?.value || "";
@@ -693,7 +844,7 @@ const addProduct = async () => {
     price,
     image,
     type,
-    category_id: type === "father" ? 2 : 3, // auto category selection
+    category_id,
     match_id,
     sizes,
     description,
@@ -761,6 +912,9 @@ window.renderAdminOrders = renderAdminOrders;
 window.advanceOrderStatus = advanceOrderStatus;
 window.setAdminOrderFilter = setAdminOrderFilter;
 window.deleteProduct = deleteProduct;
+window.saveCategory = saveCategory;
+window.deleteCategory = deleteCategory;
+window.renderAdminCategories = renderAdminCategories;
 
     </script>
   </body>

@@ -90,11 +90,64 @@ const logout = () => {
 // Cart Utilities
 const getCartItems = () => JSON.parse(localStorage.getItem("cartItems") || "[]");
 
+const syncCartWithServer = async (items) => {
+  const user = getLoggedInUser();
+  if (!user) return;
+  try {
+    await fetch("/api/cart", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username: user.username, items }),
+    });
+  } catch (err) {
+    console.error("Failed to sync cart with server:", err);
+  }
+};
+
+const fetchAndMergeCart = async () => {
+  const user = getLoggedInUser();
+  if (!user) return;
+  try {
+    const response = await fetch(`/api/cart?username=${encodeURIComponent(user.username)}`);
+    if (response.ok) {
+      const serverItems = await response.json();
+      
+      const localItems = getCartItems();
+      const mergedItems = [...serverItems];
+      
+      localItems.forEach((localItem) => {
+        const existing = mergedItems.find(
+          (item) => item.id == localItem.id && normalizeSize(item.size) === normalizeSize(localItem.size)
+        );
+        if (existing) {
+          existing.quantity = Math.max(existing.quantity || 1, localItem.quantity || 1);
+        } else {
+          mergedItems.push(localItem);
+        }
+      });
+      
+      localStorage.setItem("cartItems", JSON.stringify(mergedItems));
+      const count = mergedItems.reduce((acc, item) => acc + (item.quantity || 1), 0);
+      localStorage.setItem("cartCount", count.toString());
+      updateCartDisplay();
+      
+      await fetch("/api/cart", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: user.username, items: mergedItems }),
+      });
+    }
+  } catch (err) {
+    console.error("Failed to fetch/merge cart:", err);
+  }
+};
+
 const saveCartItems = (items) => {
   localStorage.setItem("cartItems", JSON.stringify(items));
   const count = items.reduce((acc, item) => acc + (item.quantity || 1), 0);
   localStorage.setItem("cartCount", count.toString());
   updateCartDisplay();
+  syncCartWithServer(items);
 };
 
 const updateCartDisplay = () => {
@@ -343,7 +396,12 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   updateAuthDisplay();
-  updateCartDisplay();
+  fetchAndMergeCart().then(() => {
+    updateCartDisplay();
+    if (document.getElementById("cartOverlay")?.style.display === "flex") {
+      renderCart();
+    }
+  });
 
   const loader = document.getElementById("loader");
   if (loader) {
@@ -534,3 +592,4 @@ window.showToast = showToast;
 window.fetchCategories = fetchCategories;
 window.fetchProducts = fetchProducts;
 window.checkoutCart = checkoutCart;
+window.fetchAndMergeCart = fetchAndMergeCart;
