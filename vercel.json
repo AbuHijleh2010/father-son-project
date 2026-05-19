@@ -5,4 +5,3 @@
     { "source": "/(.*)", "destination": "/public/$1" }
   ]
 }
-// Trigger Vercel Webhook Deployment
