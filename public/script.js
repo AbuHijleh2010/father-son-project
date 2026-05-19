@@ -1,4 +1,4 @@
-﻿// Initial Data Setup
+// Initial Data Setup
 const initialCategories = [
   { id: 1, name: "تخفيضات", icon: "🔥" },
   { id: 2, name: "بلايز", icon: "👕" },
@@ -121,7 +121,7 @@ const logout = () => {
   updateAuthDisplay();
   renderCart();
   showToast("تم تسجيل الخروج بنجاح");
-  if (window.location.pathname.includes("admin.html")) {
+  if (window.location.pathname.toLowerCase().includes("admin")) {
     location.reload();
   }
 };
@@ -1080,14 +1080,16 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   const mainNav = document.getElementById("mainNav");
-  window.addEventListener("scroll", () => {
-    if (window.scrollY > 50) {
-      mainNav.classList.add("scrolled");
-      mainNav.classList.add("glass");
-    } else {
-      mainNav.classList.remove("scrolled");
-    }
-  });
+  if (mainNav) {
+    window.addEventListener("scroll", () => {
+      if (window.scrollY > 50) {
+        mainNav.classList.add("scrolled");
+        mainNav.classList.add("glass");
+      } else {
+        mainNav.classList.remove("scrolled");
+      }
+    });
+  }
 
   const cartBtn = document.getElementById("cartBtn");
   const closeCart = document.getElementById("closeCart");
