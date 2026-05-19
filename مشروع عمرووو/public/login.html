@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Cache-Control"
+      content="no-cache, no-store, must-revalidate"
+    />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <title>تسجيل دخول | متجر الأب والطفل</title>
+    <link rel="stylesheet" href="style.css?v=2" />
+    <script src="https://unpkg.com/lucide@latest"></script>
+  </head>
+  <body>
+    <main class="auth-page">
+      <div class="auth-card glass">
+        <div>
+          <span class="auth-badge">مرحباً بك</span>
+          <h1 class="auth-title">تسجيل دخول سريع</h1>
+          <p class="auth-subtitle">
+            إذا كان لديك حساب، سجّل الدخول هنا واستمر في التسوق مباشرةً.
+          </p>
+        </div>
+        <form id="loginForm" class="auth-form" autocomplete="off">
+          <input
+            type="text"
+            name="fakeusernameremembered"
+            style="display: none"
+            autocomplete="username"
+          />
+          <input
+            type="password"
+            name="fakepasswordremembered"
+            style="display: none"
+            autocomplete="new-password"
+          />
+          <label class="auth-label">
+            البريد الإلكتروني
+            <input
+              type="email"
+              id="loginEmail"
+              name="email"
+              class="auth-input"
+              placeholder="البريد الإلكتروني"
+              autocomplete="email"
+            />
+          </label>
+          <label class="auth-label">
+            اسم المستخدم
+            <input
+              type="text"
+              id="loginUsername"
+              name="username"
+              class="auth-input"
+              placeholder="اسم المستخدم"
+              autocomplete="username"
+              required
+            />
+          </label>
+          <label class="auth-label">
+            كلمة المرور
+            <input
+              type="password"
+              id="loginPassword"
+              name="password"
+              class="auth-input"
+              placeholder="كلمة المرور"
+              autocomplete="new-password"
+              required
+            />
+          </label>
+          <button type="submit" class="hero-btn auth-submit">دخول</button>
+          <p class="auth-footer">
+            ليس لديك حساب؟ <a href="signup.html">إنشاء حساب الآن</a>
+          </p>
+        </form>
+        <p id="loginMessage" class="auth-message" style="display: none"></p>
+        <div
+          style="
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin-top: 10px;
+          "
+        >
+          <a href="index.html" class="nav-link">العودة للرئيسية</a>
+        </div>
+      </div>
+    </main>
+    <script>
+      const setLoadingButton = (button, text) => {
+        if (!button) return;
+        if (!button.dataset.originalText) {
+          button.dataset.originalText = button.innerHTML;
+        }
+        button.disabled = true;
+        button.classList.add("loading");
+        button.innerHTML = text;
+      };
+
+      const resetLoadingButton = (button) => {
+        if (!button) return;
+        button.disabled = false;
+        button.classList.remove("loading");
+        if (button.dataset.originalText) {
+          button.innerHTML = button.dataset.originalText;
+        }
+      };
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const emailInput = document.getElementById("loginEmail");
+        const usernameInput = document.getElementById("loginUsername");
+        const passwordInput = document.getElementById("loginPassword");
+        emailInput.value = "";
+        usernameInput.value = "";
+        passwordInput.value = "";
+        emailInput.autocomplete = "email";
+        usernameInput.autocomplete = "username";
+        passwordInput.autocomplete = "new-password";
+      });
+
+      const loginForm = document.getElementById("loginForm");
+      loginForm.addEventListener("submit", (e) => {
+        e.preventDefault();
+        const submitButton = loginForm.querySelector('button[type="submit"]');
+        setLoadingButton(submitButton, "جاري تسجيل الدخول...");
+
+        const email = document.getElementById("loginEmail").value.trim();
+        const username = document.getElementById("loginUsername").value.trim();
+        const password = document.getElementById("loginPassword").value.trim();
+        if (!username || !password) {
+          resetLoadingButton(submitButton);
+          return;
+        }
+
+        const users = JSON.parse(localStorage.getItem("shopUsers") || "[]");
+        const user = users.find(
+          (u) =>
+            ((email && u.email === email) ||
+              (username && u.username === username)) &&
+            u.password === password,
+        );
+        const message = document.getElementById("loginMessage");
+
+        if (user) {
+          localStorage.setItem(
+            "shopUser",
+            JSON.stringify({
+              username: user.username,
+              email: user.email || "",
+            }),
+          );
+          message.innerText = "تم تسجيل الدخول بنجاح. جارٍ التحويل...";
+          message.style.color = "var(--secondary)";
+          message.style.display = "block";
+          setTimeout(() => {
+            resetLoadingButton(submitButton);
+            window.location.href = "account.html";
+          }, 900);
+        } else {
+          message.innerText = "اسم المستخدم أو كلمة المرور غير صحيحة.";
+          message.style.color = "#ef4444";
+          message.style.display = "block";
+          resetLoadingButton(submitButton);
+        }
+      });
+    </script>
+  </body>
+</html>
