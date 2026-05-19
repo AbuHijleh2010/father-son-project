@@ -321,7 +321,8 @@ const addToCart = async (event, id) => {
       (item) => item.id == id && normalizeSize(item.size) === size,
     );
     const currentQuantityInCart = existing ? existing.quantity || 0 : 0;
-    if (currentQuantityInCart + 1 > (product.quantity || 0)) {
+    const availableQty = parseInt(product.quantity || 0, 10);
+    if (currentQuantityInCart + 1 > availableQty) {
       if (button) {
         button.disabled = false;
         button.classList.remove("loading");
@@ -333,8 +334,16 @@ const addToCart = async (event, id) => {
     addCartItem({ ...product, size });
     updateCartDisplay();
     showToast(`تمت الإضافة إلى السلة بنجاح! ${size ? `الحجم ${size}` : ""} 🛒`);
+    
+    // Automatically open the cart drawer for a premium UX
+    const cartOverlay = document.getElementById("cartOverlay");
+    if (cartOverlay) {
+      renderCart();
+      cartOverlay.style.display = "flex";
+    }
   } catch (err) {
     console.error("Failed to add to cart:", err);
+    alert("حدث خطأ أثناء الإضافة للسلة: " + err.message);
   } finally {
     if (button) {
       setTimeout(() => {
