@@ -1,3 +1,4 @@
+require("dotenv").config();
 const http = require("http");
 const fs = require("fs");
 const fsPromises = fs.promises;
@@ -49,85 +50,59 @@ async function writeJSONFile(filePath, data) {
   }
 }
 
-// --- DATABASE LAYER (Supabase with SQLite & JSON Graceful Fallbacks) ---
-let supabase = null;
-let useSupabase = false;
+// --- DATABASE LAYER (PostgreSQL with JSON Graceful Fallback) ---
+let pool = null;
+let usePostgres = false;
 
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey = process.env.SUPABASE_KEY;
+const databaseUrl = process.env.DATABASE_URL;
 
-if (supabaseUrl && supabaseKey) {
+if (databaseUrl) {
   try {
-    const { createClient } = require("@supabase/supabase-js");
-    supabase = createClient(supabaseUrl, supabaseKey);
-    useSupabase = true;
-    console.log("Connected to Supabase cloud database.");
+    const { Pool } = require("pg");
+    pool = new Pool({
+      connectionString: databaseUrl,
+      ssl: {
+        rejectUnauthorized: false,
+      },
+    });
+    usePostgres = true;
+    console.log("Connected to PostgreSQL cloud database.");
+    initializePostgresSchema();
   } catch (err) {
-    console.error("Failed to initialize Supabase, falling back to SQLite/JSON:", err.message);
+    console.error("Failed to initialize PostgreSQL, falling back to JSON:", err.message);
   }
 } else {
-  console.log("Supabase credentials not found in env. Falling back to local SQLite/JSON.");
+  console.log("DATABASE_URL not found in env. Falling back to local JSON database.");
 }
 
-let db = null;
-let useSQLite = false;
-
-try {
-  const sqlite3 = require("sqlite3").verbose();
-  const dbPath = path.join(DATA_DIR, "database.sqlite");
-  
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
-
-  db = new sqlite3.Database(dbPath, (err) => {
-    if (err) {
-      console.error("Failed to connect to SQLite, falling back to JSON:", err.message);
-    } else {
-      console.log("Connected to SQLite database.");
-      useSQLite = true;
-      initializeSQLiteSchema();
-    }
-  });
-} catch (e) {
-  console.warn("sqlite3 package is not available or failed to load. Falling back to JSON database:", e.message);
-}
-
-function initializeSQLiteSchema() {
-  db.serialize(() => {
-    // Categories table
-    db.run(`CREATE TABLE IF NOT EXISTS categories (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+async function initializePostgresSchema() {
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS categories (
+      id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
       icon TEXT NOT NULL
     )`);
-
-    // Products table
-    db.run(`CREATE TABLE IF NOT EXISTS products (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+    await pool.query(`CREATE TABLE IF NOT EXISTS products (
+      id SERIAL PRIMARY KEY,
       title TEXT NOT NULL,
-      price REAL NOT NULL,
+      price DOUBLE PRECISION NOT NULL,
       image TEXT,
       type TEXT NOT NULL,
-      category_id INTEGER,
+      category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
       match_id INTEGER,
       sizes TEXT,
       description TEXT,
       quantity INTEGER DEFAULT 0,
       discount INTEGER DEFAULT 0
     )`);
-
-    // Users table
-    db.run(`CREATE TABLE IF NOT EXISTS users (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+    await pool.query(`CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
       username TEXT UNIQUE NOT NULL,
       email TEXT UNIQUE NOT NULL,
       password TEXT NOT NULL,
       role TEXT DEFAULT 'user'
     )`);
-
-    // Orders table
-    db.run(`CREATE TABLE IF NOT EXISTS orders (
+    await pool.query(`CREATE TABLE IF NOT EXISTS orders (
       id TEXT PRIMARY KEY,
       name TEXT,
       email TEXT,
@@ -135,209 +110,158 @@ function initializeSQLiteSchema() {
       address TEXT,
       items TEXT,
       status TEXT,
-      total REAL,
+      total DOUBLE PRECISION,
       created_at TEXT
     )`);
-
-    // Cart table
-    db.run(`CREATE TABLE IF NOT EXISTS cart (
+    await pool.query(`CREATE TABLE IF NOT EXISTS cart (
       username TEXT PRIMARY KEY,
       items TEXT NOT NULL
     )`);
 
-    // Seeding Categories
-    db.get("SELECT COUNT(*) as count FROM categories", (err, row) => {
-      if (!err && row.count === 0) {
-        const stmt = db.prepare("INSERT INTO categories (name, icon) VALUES (?, ?)");
-        const initialCategories = [
-          { name: "تخفيضات", icon: "🔥" },
-          { name: "بلايز", icon: "👕" },
-          { name: "جينز", icon: "👖" },
-          { name: "أطقم كاملة", icon: "👔" },
-          { name: "أحذية", icon: "👟" },
-          { name: "إكسسوارات", icon: "⌚" },
-        ];
-        initialCategories.forEach(cat => stmt.run(cat.name, cat.icon));
-        stmt.finalize();
+    // Seed default categories
+    const catCheck = await pool.query("SELECT COUNT(*) as count FROM categories");
+    if (parseInt(catCheck.rows[0].count, 10) === 0) {
+      const initialCategories = [
+        { name: "تخفيضات", icon: "🔥" },
+        { name: "بلايز", icon: "👕" },
+        { name: "جينز", icon: "👖" },
+        { name: "أطقم كاملة", icon: "👔" },
+        { name: "أحذية", icon: "👟" },
+        { name: "إكسسوارات", icon: "⌚" },
+      ];
+      for (const cat of initialCategories) {
+        await pool.query("INSERT INTO categories (name, icon) VALUES ($1, $2)", [cat.name, cat.icon]);
       }
-    });
+    }
 
-    // Seeding default Admin
-    db.get("SELECT COUNT(*) as count FROM users", (err, row) => {
-      if (!err && row.count === 0) {
-        db.run(
-          "INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)",
-          ["admin", "admin@store.com", "admin123", "admin"]
-        );
-      }
-    });
-
-    // Seeding sample products
-    db.get("SELECT COUNT(*) as count FROM products", (err, row) => {
-      if (!err && row.count === 0) {
-        const stmt = db.prepare(`
-          INSERT INTO products (title, price, image, type, category_id, match_id, sizes, description, quantity, discount) 
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `);
-        stmt.run(
-          "طقم كاجوال متناسق للأب", 
-          120.0, 
-          "https://images.unsplash.com/photo-1617137968427-85924c800a22?w=500&auto=format&fit=crop", 
-          "father", 
-          4, // أطقم كاملة
-          101, 
-          "S,M,L,XL", 
-          "طقم أنيق وعصري ومريح للأب مناسب لجميع الخروجات اليومية.", 
-          10, 
-          15
-        );
-        stmt.run(
-          "طقم كاجوال متناسق للطفل", 
-          80.0, 
-          "https://images.unsplash.com/photo-1519457431-44ccd64a579b?w=500&auto=format&fit=crop", 
-          "child", 
-          4, // أطقم كاملة
-          101, 
-          "2T,4T,6T,8T", 
-          "طقم مريح وجميل للطفل، يتناسق تماماً مع إطلالة الأب.", 
-          15, 
-          10
-        );
-        stmt.finalize();
-      }
-    });
-  });
+    // Seed default admin
+    const userCheck = await pool.query("SELECT COUNT(*) as count FROM users");
+    if (parseInt(userCheck.rows[0].count, 10) === 0) {
+      await pool.query(
+        "INSERT INTO users (username, email, password, role) VALUES ($1, $2, $3, $4)",
+        ["admin", "admin@store.com", "admin123", "admin"]
+      );
+    }
+    
+    // Seed default products
+    const prodCheck = await pool.query("SELECT COUNT(*) as count FROM products");
+    if (parseInt(prodCheck.rows[0].count, 10) === 0) {
+      await pool.query(`
+        INSERT INTO products (title, price, image, type, category_id, match_id, sizes, description, quantity, discount) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `, [
+        "طقم كاجوال متناسق للأب", 
+        120.0, 
+        "https://images.unsplash.com/photo-1617137968427-85924c800a22?w=500&auto=format&fit=crop", 
+        "father", 
+        4, // أطقم كاملة
+        101, 
+        "S,M,L,XL", 
+        "طقم أنيق وعصري ومريح للأب مناسب لجميع الخروجات اليومية.", 
+        10, 
+        15
+      ]);
+      await pool.query(`
+        INSERT INTO products (title, price, image, type, category_id, match_id, sizes, description, quantity, discount) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `, [
+        "طقم كاجوال متناسق للطفل", 
+        80.0, 
+        "https://images.unsplash.com/photo-1519457431-44ccd64a579b?w=500&auto=format&fit=crop", 
+        "child", 
+        4, // أطقم كاملة
+        101, 
+        "2T,4T,6T,8T", 
+        "طقم مريح وجميل للطفل، يتناسق تماماً مع إطلالة الأب.", 
+        15, 
+        10
+      ]);
+    }
+    console.log("PostgreSQL schema and seeding completed successfully.");
+  } catch (err) {
+    console.error("PostgreSQL schema initialization failed:", err.message);
+  }
 }
 
 const DB = {
   // CATEGORIES
   async getCategories() {
-    if (useSupabase) {
+    if (usePostgres) {
       try {
-        const { data, error } = await supabase.from("categories").select("*").order("id", { ascending: true });
-        if (error) throw error;
-        return data || [];
+        const res = await pool.query("SELECT * FROM categories ORDER BY id ASC");
+        return res.rows;
       } catch (err) {
-        console.error("Supabase getCategories failed, falling back:", err.message);
+        console.error("PostgreSQL getCategories failed, falling back:", err.message);
       }
     }
-    if (useSQLite) {
-      return new Promise((resolve, reject) => {
-        db.all("SELECT * FROM categories", [], (err, rows) => {
-          if (err) reject(err);
-          else resolve(rows);
-        });
-      });
-    } else {
-      return readJSONFile(CATEGORIES_FILE, [
-        { id: 1, name: "تخفيضات", icon: "🔥" },
-        { id: 2, name: "بلايز", icon: "👕" },
-        { id: 3, name: "جينز", icon: "👖" },
-        { id: 4, name: "أطقم كاملة", icon: "👔" },
-        { id: 5, name: "أحذية", icon: "👟" },
-        { id: 6, name: "إكسسوارات", icon: "⌚" },
-      ]);
-    }
+    return readJSONFile(CATEGORIES_FILE, [
+      { id: 1, name: "تخفيضات", icon: "🔥" },
+      { id: 2, name: "بلايز", icon: "👕" },
+      { id: 3, name: "جينز", icon: "👖" },
+      { id: 4, name: "أطقم كاملة", icon: "👔" },
+      { id: 5, name: "أحذية", icon: "👟" },
+      { id: 6, name: "إكسسوارات", icon: "⌚" },
+    ]);
   },
 
   async saveCategory(category) {
-    if (useSupabase) {
+    if (usePostgres) {
       try {
         if (category.id) {
-          const { data, error } = await supabase
-            .from("categories")
-            .update({ name: category.name, icon: category.icon })
-            .eq("id", category.id)
-            .select()
-            .single();
-          if (error) throw error;
-          return data;
+          const res = await pool.query(
+            "UPDATE categories SET name = $1, icon = $2 WHERE id = $3 RETURNING *",
+            [category.name, category.icon, category.id]
+          );
+          return res.rows[0];
         } else {
-          const { data, error } = await supabase
-            .from("categories")
-            .insert({ name: category.name, icon: category.icon })
-            .select()
-            .single();
-          if (error) throw error;
-          return data;
+          const res = await pool.query(
+            "INSERT INTO categories (name, icon) VALUES ($1, $2) RETURNING *",
+            [category.name, category.icon]
+          );
+          return res.rows[0];
         }
       } catch (err) {
-        console.error("Supabase saveCategory failed, falling back:", err.message);
+        console.error("PostgreSQL saveCategory failed, falling back:", err.message);
       }
     }
-    if (useSQLite) {
-      return new Promise((resolve, reject) => {
-        if (category.id) {
-          db.run(
-            "UPDATE categories SET name = ?, icon = ? WHERE id = ?",
-            [category.name, category.icon, category.id],
-            function (err) {
-              if (err) reject(err);
-              else resolve({ id: Number(category.id), ...category });
-            }
-          );
-        } else {
-          db.run(
-            "INSERT INTO categories (name, icon) VALUES (?, ?)",
-            [category.name, category.icon],
-            function (err) {
-              if (err) reject(err);
-              else resolve({ id: this.lastID, ...category });
-            }
-          );
-        }
-      });
-    } else {
-      const categories = await this.getCategories();
-      if (category.id) {
-        const index = categories.findIndex((c) => c.id == category.id);
-        if (index !== -1) {
-          categories[index] = { ...categories[index], ...category };
-          await writeJSONFile(CATEGORIES_FILE, categories);
-          return categories[index];
-        }
+    const categories = await this.getCategories();
+    if (category.id) {
+      const index = categories.findIndex((c) => c.id == category.id);
+      if (index !== -1) {
+        categories[index] = { ...categories[index], ...category };
+        await writeJSONFile(CATEGORIES_FILE, categories);
+        return categories[index];
       }
-      category.id = Date.now();
-      categories.push(category);
-      await writeJSONFile(CATEGORIES_FILE, categories);
-      return category;
     }
+    category.id = Date.now();
+    categories.push(category);
+    await writeJSONFile(CATEGORIES_FILE, categories);
+    return category;
   },
 
   async deleteCategory(id) {
-    if (useSupabase) {
+    if (usePostgres) {
       try {
-        const { error } = await supabase.from("categories").delete().eq("id", id);
-        if (error) throw error;
-        return true;
+        const res = await pool.query("DELETE FROM categories WHERE id = $1", [id]);
+        return res.rowCount > 0;
       } catch (err) {
-        console.error("Supabase deleteCategory failed, falling back:", err.message);
+        console.error("PostgreSQL deleteCategory failed, falling back:", err.message);
       }
     }
-    if (useSQLite) {
-      return new Promise((resolve, reject) => {
-        db.run("DELETE FROM categories WHERE id = ?", [id], function (err) {
-          if (err) reject(err);
-          else resolve(this.changes > 0);
-        });
-      });
-    } else {
-      const categories = await this.getCategories();
-      const filtered = categories.filter((c) => c.id != id);
-      await writeJSONFile(CATEGORIES_FILE, filtered);
-      return categories.length !== filtered.length;
-    }
+    const categories = await this.getCategories();
+    const filtered = categories.filter((c) => c.id != id);
+    await writeJSONFile(CATEGORIES_FILE, filtered);
+    return categories.length !== filtered.length;
   },
 
   // PRODUCTS
   async getProducts() {
-    if (useSupabase) {
+    if (usePostgres) {
       try {
-        const { data, error } = await supabase.from("products").select("*");
-        if (error) throw error;
-        return (data || []).map((p) => ({
+        const res = await pool.query("SELECT * FROM products ORDER BY id ASC");
+        return res.rows.map((p) => ({
           ...p,
-          sizes: Array.isArray(p.sizes) ? p.sizes : (p.sizes ? p.sizes.split(",") : []),
+          sizes: p.sizes ? p.sizes.split(",") : [],
           price: parseFloat(p.price),
           quantity: parseInt(p.quantity || 0, 10),
           discount: parseInt(p.discount || 0, 10),
@@ -345,293 +269,150 @@ const DB = {
           category_id: p.category_id ? parseInt(p.category_id, 10) : null,
         }));
       } catch (err) {
-        console.error("Supabase getProducts failed, falling back:", err.message);
+        console.error("PostgreSQL getProducts failed, falling back:", err.message);
       }
     }
-    if (useSQLite) {
-      return new Promise((resolve, reject) => {
-        db.all("SELECT * FROM products", [], (err, rows) => {
-          if (err) reject(err);
-          else {
-            const products = rows.map((row) => ({
-              ...row,
-              sizes: row.sizes ? row.sizes.split(",") : [],
-              price: parseFloat(row.price),
-              quantity: parseInt(row.quantity || 0, 10),
-              discount: parseInt(row.discount || 0, 10),
-              match_id: parseInt(row.match_id || 0, 10),
-              category_id: parseInt(row.category_id || 0, 10),
-            }));
-            resolve(products);
-          }
-        });
-      });
-    } else {
-      return readJSONFile(PRODUCTS_FILE, []);
-    }
+    return readJSONFile(PRODUCTS_FILE, []);
   },
 
   async saveProduct(product) {
-    if (useSupabase) {
+    const sizesStr = Array.isArray(product.sizes) ? product.sizes.join(",") : (product.sizes || "");
+    if (usePostgres) {
       try {
-        const payload = {
-          title: product.title,
-          price: parseFloat(product.price),
-          image: product.image,
-          type: product.type,
-          category_id: product.category_id ? parseInt(product.category_id, 10) : null,
-          match_id: product.match_id ? parseInt(product.match_id, 10) : null,
-          sizes: Array.isArray(product.sizes) ? product.sizes : (product.sizes ? product.sizes.split(",").map(s => s.trim()).filter(Boolean) : []),
-          description: product.description,
-          quantity: parseInt(product.quantity || 0, 10),
-          discount: parseInt(product.discount || 0, 10),
-        };
         if (product.id) {
-          const { data, error } = await supabase
-            .from("products")
-            .update(payload)
-            .eq("id", product.id)
-            .select()
-            .single();
-          if (error) throw error;
-          return { ...data, sizes: Array.isArray(data.sizes) ? data.sizes : [] };
+          const res = await pool.query(
+            `UPDATE products SET title = $1, price = $2, image = $3, type = $4, category_id = $5, 
+             match_id = $6, sizes = $7, description = $8, quantity = $9, discount = $10 WHERE id = $11 RETURNING *`,
+            [
+              product.title,
+              parseFloat(product.price),
+              product.image,
+              product.type,
+              product.category_id ? parseInt(product.category_id, 10) : null,
+              product.match_id ? parseInt(product.match_id, 10) : null,
+              sizesStr,
+              product.description,
+              parseInt(product.quantity || 0, 10),
+              parseInt(product.discount || 0, 10),
+              product.id,
+            ]
+          );
+          const p = res.rows[0];
+          return p ? { ...p, sizes: p.sizes ? p.sizes.split(",") : [] } : null;
         } else {
-          const { data, error } = await supabase
-            .from("products")
-            .insert(payload)
-            .select()
-            .single();
-          if (error) throw error;
-          return { ...data, sizes: Array.isArray(data.sizes) ? data.sizes : [] };
+          const res = await pool.query(
+            `INSERT INTO products (title, price, image, type, category_id, match_id, sizes, description, quantity, discount) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+            [
+              product.title,
+              parseFloat(product.price),
+              product.image,
+              product.type,
+              product.category_id ? parseInt(product.category_id, 10) : null,
+              product.match_id ? parseInt(product.match_id, 10) : null,
+              sizesStr,
+              product.description,
+              parseInt(product.quantity || 0, 10),
+              parseInt(product.discount || 0, 10),
+            ]
+          );
+          const p = res.rows[0];
+          return p ? { ...p, sizes: p.sizes ? p.sizes.split(",") : [] } : null;
         }
       } catch (err) {
-        console.error("Supabase saveProduct failed, falling back:", err.message);
+        console.error("PostgreSQL saveProduct failed, falling back:", err.message);
       }
     }
-    if (useSQLite) {
-      const sizesStr = Array.isArray(product.sizes) ? product.sizes.join(",") : (product.sizes || "");
-      return new Promise((resolve, reject) => {
-        if (product.id) {
-          db.run(
-            `UPDATE products SET title = ?, price = ?, image = ?, type = ?, category_id = ?, 
-             match_id = ?, sizes = ?, description = ?, quantity = ?, discount = ? WHERE id = ?`,
-            [
-              product.title,
-              product.price,
-              product.image,
-              product.type,
-              product.category_id,
-              product.match_id,
-              sizesStr,
-              product.description,
-              product.quantity,
-              product.discount,
-              product.id,
-            ],
-            function (err) {
-              if (err) reject(err);
-              else resolve({ ...product });
-            }
-          );
-        } else {
-          db.run(
-            `INSERT INTO products (title, price, image, type, category_id, match_id, sizes, description, quantity, discount) 
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-            [
-              product.title,
-              product.price,
-              product.image,
-              product.type,
-              product.category_id,
-              product.match_id,
-              sizesStr,
-              product.description,
-              product.quantity,
-              product.discount,
-            ],
-            function (err) {
-              if (err) reject(err);
-              else resolve({ id: this.lastID, ...product });
-            }
-          );
-        }
-      });
-    } else {
-      const products = await this.getProducts();
-      if (product.id) {
-        const index = products.findIndex((p) => p.id.toString() === product.id.toString());
-        if (index !== -1) {
-          products[index] = { ...products[index], ...product };
-          await writeJSONFile(PRODUCTS_FILE, products);
-          return products[index];
-        } else {
-          throw new Error("Product not found");
-        }
-      } else {
-        const newProduct = { ...product, id: Date.now() };
-        products.push(newProduct);
+    const products = await this.getProducts();
+    if (product.id) {
+      const index = products.findIndex((p) => p.id.toString() === product.id.toString());
+      if (index !== -1) {
+        products[index] = { ...products[index], ...product };
         await writeJSONFile(PRODUCTS_FILE, products);
-        return newProduct;
+        return products[index];
+      } else {
+        throw new Error("Product not found");
       }
+    } else {
+      const newProduct = { ...product, id: Date.now() };
+      products.push(newProduct);
+      await writeJSONFile(PRODUCTS_FILE, products);
+      return newProduct;
     }
   },
 
   async deleteProduct(id) {
-    if (useSupabase) {
+    if (usePostgres) {
       try {
-        const { error } = await supabase.from("products").delete().eq("id", id);
-        if (error) throw error;
-        return true;
+        const res = await pool.query("DELETE FROM products WHERE id = $1", [id]);
+        return res.rowCount > 0;
       } catch (err) {
-        console.error("Supabase deleteProduct failed, falling back:", err.message);
+        console.error("PostgreSQL deleteProduct failed, falling back:", err.message);
       }
     }
-    if (useSQLite) {
-      return new Promise((resolve, reject) => {
-        db.run("DELETE FROM products WHERE id = ?", [id], function (err) {
-          if (err) reject(err);
-          else resolve(this.changes > 0);
-        });
-      });
-    } else {
-      const products = await this.getProducts();
-      const filtered = products.filter((p) => p.id.toString() !== id.toString());
-      await writeJSONFile(PRODUCTS_FILE, filtered);
-      return products.length !== filtered.length;
-    }
+    const products = await this.getProducts();
+    const filtered = products.filter((p) => p.id.toString() !== id.toString());
+    await writeJSONFile(PRODUCTS_FILE, filtered);
+    return products.length !== filtered.length;
   },
 
   // USERS
   async getUsers() {
-    if (useSupabase) {
+    if (usePostgres) {
       try {
-        const { data, error } = await supabase.from("users").select("*");
-        if (error) throw error;
-        return data || [];
+        const res = await pool.query("SELECT * FROM users");
+        return res.rows;
       } catch (err) {
-        console.error("Supabase getUsers failed, falling back:", err.message);
+        console.error("PostgreSQL getUsers failed, falling back:", err.message);
       }
     }
-    if (useSQLite) {
-      return new Promise((resolve, reject) => {
-        db.all("SELECT * FROM users", [], (err, rows) => {
-          if (err) reject(err);
-          else resolve(rows);
-        });
-      });
-    } else {
-      return readJSONFile(USERS_FILE, [
-        { username: "admin", email: "admin@store.com", password: "admin123", role: "admin" }
-      ]);
-    }
+    return readJSONFile(USERS_FILE, [
+      { username: "admin", email: "admin@store.com", password: "admin123", role: "admin" }
+    ]);
   },
 
   async createUser(user) {
-    if (useSupabase) {
+    if (usePostgres) {
       try {
-        const { data, error } = await supabase
-          .from("users")
-          .insert({
-            username: user.username,
-            email: user.email,
-            password: user.password,
-            role: user.role || "user",
-          })
-          .select()
-          .single();
-        if (error) throw error;
-        return data;
+        const res = await pool.query(
+          "INSERT INTO users (username, email, password, role) VALUES ($1, $2, $3, $4) RETURNING *",
+          [user.username, user.email, user.password, user.role || "user"]
+        );
+        return res.rows[0];
       } catch (err) {
-        console.error("Supabase createUser failed, falling back:", err.message);
+        console.error("PostgreSQL createUser failed, falling back:", err.message);
       }
     }
-    if (useSQLite) {
-      return new Promise((resolve, reject) => {
-        db.run(
-          "INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)",
-          [user.username, user.email, user.password, user.role || "user"],
-          function (err) {
-            if (err) reject(err);
-            else resolve({ id: this.lastID, ...user });
-          }
-        );
-      });
-    } else {
-      const users = await this.getUsers();
-      users.push(user);
-      await writeJSONFile(USERS_FILE, users);
-      return user;
-    }
+    const users = await this.getUsers();
+    users.push(user);
+    await writeJSONFile(USERS_FILE, users);
+    return user;
   },
 
   // ORDERS
   async getOrders() {
-    if (useSupabase) {
+    if (usePostgres) {
       try {
-        const { data, error } = await supabase.from("orders").select("*");
-        if (error) throw error;
-        return (data || []).map((o) => ({
-          ...o,
-          items: Array.isArray(o.items) ? o.items : (typeof o.items === "string" ? JSON.parse(o.items) : []),
-          total: parseFloat(o.total),
+        const res = await pool.query("SELECT * FROM orders");
+        return res.rows.map((row) => ({
+          ...row,
+          items: JSON.parse(row.items || "[]"),
+          total: parseFloat(row.total),
         }));
       } catch (err) {
-        console.error("Supabase getOrders failed, falling back:", err.message);
+        console.error("PostgreSQL getOrders failed, falling back:", err.message);
       }
     }
-    if (useSQLite) {
-      return new Promise((resolve, reject) => {
-        db.all("SELECT * FROM orders", [], (err, rows) => {
-          if (err) reject(err);
-          else {
-            const orders = rows.map((row) => ({
-              ...row,
-              items: JSON.parse(row.items || "[]"),
-              total: parseFloat(row.total),
-            }));
-            resolve(orders);
-          }
-        });
-      });
-    } else {
-      return readJSONFile(ORDERS_FILE, []);
-    }
+    return readJSONFile(ORDERS_FILE, []);
   },
 
   async createOrder(order) {
-    if (useSupabase) {
+    const itemsStr = JSON.stringify(order.items || []);
+    if (usePostgres) {
       try {
-        const { data, error } = await supabase
-          .from("orders")
-          .insert({
-            id: order.id,
-            name: order.name,
-            email: order.email,
-            phone: order.phone,
-            address: order.address,
-            items: order.items || [],
-            status: order.status,
-            total: parseFloat(order.total),
-            created_at: order.created_at,
-          })
-          .select()
-          .single();
-        if (error) throw error;
-        return {
-          ...data,
-          items: Array.isArray(data.items) ? data.items : [],
-          total: parseFloat(data.total),
-        };
-      } catch (err) {
-        console.error("Supabase createOrder failed, falling back:", err.message);
-      }
-    }
-    if (useSQLite) {
-      const itemsStr = JSON.stringify(order.items || []);
-      return new Promise((resolve, reject) => {
-        db.run(
+        const res = await pool.query(
           `INSERT INTO orders (id, name, email, phone, address, items, status, total, created_at) 
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
           [
             order.id,
             order.name,
@@ -642,109 +423,73 @@ const DB = {
             order.status,
             order.total,
             order.created_at,
-          ],
-          function (err) {
-            if (err) reject(err);
-            else resolve(order);
-          }
+          ]
         );
-      });
-    } else {
-      const orders = await this.getOrders();
-      orders.push(order);
-      await writeJSONFile(ORDERS_FILE, orders);
-      return order;
+        const o = res.rows[0];
+        return o ? { ...o, items: JSON.parse(o.items || "[]"), total: parseFloat(o.total) } : null;
+      } catch (err) {
+        console.error("PostgreSQL createOrder failed, falling back:", err.message);
+      }
     }
+    const orders = await this.getOrders();
+    orders.push(order);
+    await writeJSONFile(ORDERS_FILE, orders);
+    return order;
   },
 
   async updateOrderStatus(id, status) {
-    if (useSupabase) {
+    if (usePostgres) {
       try {
-        const { error } = await supabase.from("orders").update({ status }).eq("id", id);
-        if (error) throw error;
-        return true;
+        const res = await pool.query("UPDATE orders SET status = $1 WHERE id = $2", [status, id]);
+        return res.rowCount > 0;
       } catch (err) {
-        console.error("Supabase updateOrderStatus failed, falling back:", err.message);
+        console.error("PostgreSQL updateOrderStatus failed, falling back:", err.message);
       }
     }
-    if (useSQLite) {
-      return new Promise((resolve, reject) => {
-        db.run("UPDATE orders SET status = ? WHERE id = ?", [status, id], function (err) {
-          if (err) reject(err);
-          else resolve(this.changes > 0);
-        });
-      });
-    } else {
-      const orders = await this.getOrders();
-      const index = orders.findIndex((o) => o.id === id);
-      if (index !== -1) {
-        orders[index].status = status;
-        await writeJSONFile(ORDERS_FILE, orders);
-        return true;
-      }
-      return false;
+    const orders = await this.getOrders();
+    const index = orders.findIndex((o) => o.id === id);
+    if (index !== -1) {
+      orders[index].status = status;
+      await writeJSONFile(ORDERS_FILE, orders);
+      return true;
     }
+    return false;
   },
 
   // CART
   async getCart(username) {
-    if (useSupabase) {
+    if (usePostgres) {
       try {
-        const { data, error } = await supabase
-          .from("cart")
-          .select("items")
-          .eq("username", username)
-          .maybeSingle();
-        if (error) throw error;
-        return data && Array.isArray(data.items) ? data.items : [];
+        const res = await pool.query("SELECT items FROM cart WHERE username = $1", [username]);
+        return res.rows[0] ? JSON.parse(res.rows[0].items) : [];
       } catch (err) {
-        console.error("Supabase getCart failed, falling back:", err.message);
+        console.error("PostgreSQL getCart failed, falling back:", err.message);
       }
     }
-    if (useSQLite) {
-      return new Promise((resolve, reject) => {
-        db.get("SELECT items FROM cart WHERE username = ?", [username], (err, row) => {
-          if (err) reject(err);
-          else resolve(row ? JSON.parse(row.items) : []);
-        });
-      });
-    } else {
-      const carts = await readJSONFile(CARTS_FILE, {});
-      return carts[username] || [];
-    }
+    const carts = await readJSONFile(CARTS_FILE, {});
+    return carts[username] || [];
   },
 
   async saveCart(username, items) {
-    if (useSupabase) {
+    const itemsStr = JSON.stringify(items);
+    if (usePostgres) {
       try {
-        const { error } = await supabase.from("cart").upsert({ username, items });
-        if (error) throw error;
+        await pool.query(
+          `INSERT INTO cart (username, items) VALUES ($1, $2) 
+           ON CONFLICT(username) DO UPDATE SET items = EXCLUDED.items`,
+          [username, itemsStr]
+        );
         return true;
       } catch (err) {
-        console.error("Supabase saveCart failed, falling back:", err.message);
+        console.error("PostgreSQL saveCart failed, falling back:", err.message);
       }
     }
-    if (useSQLite) {
-      const itemsStr = JSON.stringify(items);
-      return new Promise((resolve, reject) => {
-        db.run(
-          `INSERT INTO cart (username, items) VALUES (?, ?) 
-           ON CONFLICT(username) DO UPDATE SET items = excluded.items`,
-          [username, itemsStr],
-          function (err) {
-            if (err) reject(err);
-            else resolve(true);
-          }
-        );
-      });
-    } else {
-      const carts = await readJSONFile(CARTS_FILE, {});
-      carts[username] = items;
-      await writeJSONFile(CARTS_FILE, carts);
-      return true;
-    }
+    const carts = await readJSONFile(CARTS_FILE, {});
+    carts[username] = items;
+    await writeJSONFile(CARTS_FILE, carts);
+    return true;
   }
-};;
+};
 
 const getRequestBody = (req) => {
   return new Promise((resolve, reject) => {
