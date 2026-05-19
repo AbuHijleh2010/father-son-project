@@ -16,6 +16,11 @@ const originalFetch = window.fetch;
 window.fetch = function (input, init) {
   if (typeof input === "string" && input.startsWith("/api/")) {
     input = API_BASE_URL + input;
+    const method = (init && init.method) || "GET";
+    if (method.toUpperCase() === "GET") {
+      const separator = input.includes("?") ? "&" : "?";
+      input += separator + "_t=" + new Date().getTime();
+    }
   }
   return originalFetch(input, init);
 };
