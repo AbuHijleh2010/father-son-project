@@ -1110,6 +1110,214 @@ th { color: var(--text-muted); }
     cursor: pointer;
 }
 
-@media (max-width: 480px) {
-    .cart-sidebar { width: 100%; }
+/* ==========================================================================
+   Comprehensive Responsiveness and Design Polish
+   ========================================================================== */
+
+/* Large Tablets and Medium Screens (max-width: 1024px) */
+@media (max-width: 1024px) {
+  .container {
+    padding: 0 24px;
+  }
+  
+  .hero {
+    padding: 0 40px;
+    height: 400px;
+  }
+  
+  .hero-title {
+    font-size: 42px;
+  }
 }
+
+/* Small Tablets / Large Phones (max-width: 768px) */
+@media (max-width: 768px) {
+  /* Navbar responsiveness */
+  nav {
+    height: auto !important;
+    padding: 12px 16px !important;
+    position: sticky !important; /* Becomes sticky on mobile to avoid overlapping */
+    top: 0;
+  }
+  
+  nav.scrolled {
+    height: auto !important;
+    background: rgba(2, 6, 23, 0.95);
+  }
+  
+  .nav-container {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  
+  /* Place the search container in its own full-width row below Logo and Actions */
+  .search-container {
+    flex: 0 0 100%;
+    order: 3;
+    margin: 6px 0 0 0;
+  }
+  
+  .search-input {
+    padding: 10px 18px;
+    font-size: 14px;
+  }
+  
+  .nav-actions {
+    gap: 6px;
+  }
+  
+  .nav-icon {
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    font-size: 15px;
+  }
+
+  .nav-actions span {
+    font-size: 13px !important;
+  }
+  
+  /* Hero layout adjustments */
+  .hero {
+    height: auto;
+    min-height: 340px;
+    padding: 40px 20px;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+    margin: 10px 0 30px;
+  }
+  
+  .hero-content {
+    max-width: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .hero-title {
+    font-size: 30px;
+    margin-bottom: 12px;
+  }
+  
+  .hero-content p {
+    font-size: 1rem !important;
+    margin-bottom: 20px !important;
+    max-width: 100% !important;
+  }
+  
+  .hero-btn {
+    padding: 12px 24px;
+    font-size: 16px;
+  }
+  
+  .hero-overlay {
+    background: linear-gradient(to top, var(--bg-main) 70%, rgba(2, 6, 23, 0.4));
+  }
+  
+  .hero-image {
+    opacity: 0.35;
+  }
+  
+  /* Override inline padding-top for fixed navbar when it is sticky */
+  main.container {
+    padding-top: 15px !important;
+  }
+  
+  /* Categories scroll styling */
+  .categories-grid {
+    gap: 12px;
+    margin-bottom: 30px;
+    padding-bottom: 10px;
+  }
+  
+  .category-card {
+    min-width: 110px;
+    padding: 20px 10px;
+  }
+
+  .category-card span {
+    font-size: 0.95rem;
+  }
+  
+  /* Admin statistics responsive layout */
+  .admin-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Responsive tracking steps */
+  .glass > div[style*="display: grid"][style*="gap: 10px"] {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Medium Phones (max-width: 576px) */
+@media (max-width: 576px) {
+  /* Auth cards and login pages */
+  .auth-page {
+    padding: 40px 12px;
+  }
+  
+  .auth-card {
+    padding: 24px 16px;
+    border-radius: var(--radius-md);
+  }
+  
+  .auth-title {
+    font-size: 1.6rem;
+  }
+  
+  .auth-subtitle {
+    font-size: 0.85rem;
+  }
+  
+  .auth-input, .auth-submit {
+    padding: 12px 14px;
+    border-radius: 12px;
+  }
+  
+  /* Products grid layout - 1 column centered for beautiful rendering */
+  .products-grid {
+    grid-template-columns: 1fr;
+    max-width: 340px;
+    margin: 0 auto;
+    gap: 20px;
+  }
+  
+  .product-card {
+    max-width: 100%;
+  }
+
+  .cart-sidebar {
+    width: 100% !important;
+  }
+}
+
+/* Extra Small Phones (max-width: 420px) */
+@media (max-width: 420px) {
+  .logo span {
+    display: none; /* Hide full text to prevent overlap */
+  }
+  
+  .logo::after {
+    content: 'الأب والطفل'; /* Shorter text for tiny screens */
+    font-size: 16px;
+    font-weight: 900;
+  }
+  
+  .nav-actions {
+    gap: 4px;
+  }
+  
+  .nav-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    font-size: 13px;
+  }
+  
+  .admin-stats {
+    grid-template-columns: 1fr;
+  }
+}
+
