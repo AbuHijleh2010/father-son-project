@@ -49,7 +49,26 @@ async function writeJSONFile(filePath, data) {
   }
 }
 
-// --- DATABASE LAYER (SQLite with JSON Graceful Fallback) ---
+// --- DATABASE LAYER (Supabase with SQLite & JSON Graceful Fallbacks) ---
+let supabase = null;
+let useSupabase = false;
+
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_KEY;
+
+if (supabaseUrl && supabaseKey) {
+  try {
+    const { createClient } = require("@supabase/supabase-js");
+    supabase = createClient(supabaseUrl, supabaseKey);
+    useSupabase = true;
+    console.log("Connected to Supabase cloud database.");
+  } catch (err) {
+    console.error("Failed to initialize Supabase, falling back to SQLite/JSON:", err.message);
+  }
+} else {
+  console.log("Supabase credentials not found in env. Falling back to local SQLite/JSON.");
+}
+
 let db = null;
 let useSQLite = false;
 
@@ -193,6 +212,15 @@ function initializeSQLiteSchema() {
 const DB = {
   // CATEGORIES
   async getCategories() {
+    if (useSupabase) {
+      try {
+        const { data, error } = await supabase.from("categories").select("*").order("id", { ascending: true });
+        if (error) throw error;
+        return data || [];
+      } catch (err) {
+        console.error("Supabase getCategories failed, falling back:", err.message);
+      }
+    }
     if (useSQLite) {
       return new Promise((resolve, reject) => {
         db.all("SELECT * FROM categories", [], (err, rows) => {
@@ -213,6 +241,30 @@ const DB = {
   },
 
   async saveCategory(category) {
+    if (useSupabase) {
+      try {
+        if (category.id) {
+          const { data, error } = await supabase
+            .from("categories")
+            .update({ name: category.name, icon: category.icon })
+            .eq("id", category.id)
+            .select()
+            .single();
+          if (error) throw error;
+          return data;
+        } else {
+          const { data, error } = await supabase
+            .from("categories")
+            .insert({ name: category.name, icon: category.icon })
+            .select()
+            .single();
+          if (error) throw error;
+          return data;
+        }
+      } catch (err) {
+        console.error("Supabase saveCategory failed, falling back:", err.message);
+      }
+    }
     if (useSQLite) {
       return new Promise((resolve, reject) => {
         if (category.id) {
@@ -253,6 +305,15 @@ const DB = {
   },
 
   async deleteCategory(id) {
+    if (useSupabase) {
+      try {
+        const { error } = await supabase.from("categories").delete().eq("id", id);
+        if (error) throw error;
+        return true;
+      } catch (err) {
+        console.error("Supabase deleteCategory failed, falling back:", err.message);
+      }
+    }
     if (useSQLite) {
       return new Promise((resolve, reject) => {
         db.run("DELETE FROM categories WHERE id = ?", [id], function (err) {
@@ -270,6 +331,23 @@ const DB = {
 
   // PRODUCTS
   async getProducts() {
+    if (useSupabase) {
+      try {
+        const { data, error } = await supabase.from("products").select("*");
+        if (error) throw error;
+        return (data || []).map((p) => ({
+          ...p,
+          sizes: Array.isArray(p.sizes) ? p.sizes : (p.sizes ? p.sizes.split(",") : []),
+          price: parseFloat(p.price),
+          quantity: parseInt(p.quantity || 0, 10),
+          discount: parseInt(p.discount || 0, 10),
+          match_id: parseInt(p.match_id || 0, 10),
+          category_id: p.category_id ? parseInt(p.category_id, 10) : null,
+        }));
+      } catch (err) {
+        console.error("Supabase getProducts failed, falling back:", err.message);
+      }
+    }
     if (useSQLite) {
       return new Promise((resolve, reject) => {
         db.all("SELECT * FROM products", [], (err, rows) => {
@@ -294,6 +372,42 @@ const DB = {
   },
 
   async saveProduct(product) {
+    if (useSupabase) {
+      try {
+        const payload = {
+          title: product.title,
+          price: parseFloat(product.price),
+          image: product.image,
+          type: product.type,
+          category_id: product.category_id ? parseInt(product.category_id, 10) : null,
+          match_id: product.match_id ? parseInt(product.match_id, 10) : null,
+          sizes: Array.isArray(product.sizes) ? product.sizes : (product.sizes ? product.sizes.split(",").map(s => s.trim()).filter(Boolean) : []),
+          description: product.description,
+          quantity: parseInt(product.quantity || 0, 10),
+          discount: parseInt(product.discount || 0, 10),
+        };
+        if (product.id) {
+          const { data, error } = await supabase
+            .from("products")
+            .update(payload)
+            .eq("id", product.id)
+            .select()
+            .single();
+          if (error) throw error;
+          return { ...data, sizes: Array.isArray(data.sizes) ? data.sizes : [] };
+        } else {
+          const { data, error } = await supabase
+            .from("products")
+            .insert(payload)
+            .select()
+            .single();
+          if (error) throw error;
+          return { ...data, sizes: Array.isArray(data.sizes) ? data.sizes : [] };
+        }
+      } catch (err) {
+        console.error("Supabase saveProduct failed, falling back:", err.message);
+      }
+    }
     if (useSQLite) {
       const sizesStr = Array.isArray(product.sizes) ? product.sizes.join(",") : (product.sizes || "");
       return new Promise((resolve, reject) => {
@@ -363,6 +477,15 @@ const DB = {
   },
 
   async deleteProduct(id) {
+    if (useSupabase) {
+      try {
+        const { error } = await supabase.from("products").delete().eq("id", id);
+        if (error) throw error;
+        return true;
+      } catch (err) {
+        console.error("Supabase deleteProduct failed, falling back:", err.message);
+      }
+    }
     if (useSQLite) {
       return new Promise((resolve, reject) => {
         db.run("DELETE FROM products WHERE id = ?", [id], function (err) {
@@ -380,6 +503,15 @@ const DB = {
 
   // USERS
   async getUsers() {
+    if (useSupabase) {
+      try {
+        const { data, error } = await supabase.from("users").select("*");
+        if (error) throw error;
+        return data || [];
+      } catch (err) {
+        console.error("Supabase getUsers failed, falling back:", err.message);
+      }
+    }
     if (useSQLite) {
       return new Promise((resolve, reject) => {
         db.all("SELECT * FROM users", [], (err, rows) => {
@@ -395,6 +527,24 @@ const DB = {
   },
 
   async createUser(user) {
+    if (useSupabase) {
+      try {
+        const { data, error } = await supabase
+          .from("users")
+          .insert({
+            username: user.username,
+            email: user.email,
+            password: user.password,
+            role: user.role || "user",
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        return data;
+      } catch (err) {
+        console.error("Supabase createUser failed, falling back:", err.message);
+      }
+    }
     if (useSQLite) {
       return new Promise((resolve, reject) => {
         db.run(
@@ -416,6 +566,19 @@ const DB = {
 
   // ORDERS
   async getOrders() {
+    if (useSupabase) {
+      try {
+        const { data, error } = await supabase.from("orders").select("*");
+        if (error) throw error;
+        return (data || []).map((o) => ({
+          ...o,
+          items: Array.isArray(o.items) ? o.items : (typeof o.items === "string" ? JSON.parse(o.items) : []),
+          total: parseFloat(o.total),
+        }));
+      } catch (err) {
+        console.error("Supabase getOrders failed, falling back:", err.message);
+      }
+    }
     if (useSQLite) {
       return new Promise((resolve, reject) => {
         db.all("SELECT * FROM orders", [], (err, rows) => {
@@ -436,6 +599,33 @@ const DB = {
   },
 
   async createOrder(order) {
+    if (useSupabase) {
+      try {
+        const { data, error } = await supabase
+          .from("orders")
+          .insert({
+            id: order.id,
+            name: order.name,
+            email: order.email,
+            phone: order.phone,
+            address: order.address,
+            items: order.items || [],
+            status: order.status,
+            total: parseFloat(order.total),
+            created_at: order.created_at,
+          })
+          .select()
+          .single();
+        if (error) throw error;
+        return {
+          ...data,
+          items: Array.isArray(data.items) ? data.items : [],
+          total: parseFloat(data.total),
+        };
+      } catch (err) {
+        console.error("Supabase createOrder failed, falling back:", err.message);
+      }
+    }
     if (useSQLite) {
       const itemsStr = JSON.stringify(order.items || []);
       return new Promise((resolve, reject) => {
@@ -468,6 +658,15 @@ const DB = {
   },
 
   async updateOrderStatus(id, status) {
+    if (useSupabase) {
+      try {
+        const { error } = await supabase.from("orders").update({ status }).eq("id", id);
+        if (error) throw error;
+        return true;
+      } catch (err) {
+        console.error("Supabase updateOrderStatus failed, falling back:", err.message);
+      }
+    }
     if (useSQLite) {
       return new Promise((resolve, reject) => {
         db.run("UPDATE orders SET status = ? WHERE id = ?", [status, id], function (err) {
@@ -489,6 +688,19 @@ const DB = {
 
   // CART
   async getCart(username) {
+    if (useSupabase) {
+      try {
+        const { data, error } = await supabase
+          .from("cart")
+          .select("items")
+          .eq("username", username)
+          .maybeSingle();
+        if (error) throw error;
+        return data && Array.isArray(data.items) ? data.items : [];
+      } catch (err) {
+        console.error("Supabase getCart failed, falling back:", err.message);
+      }
+    }
     if (useSQLite) {
       return new Promise((resolve, reject) => {
         db.get("SELECT items FROM cart WHERE username = ?", [username], (err, row) => {
@@ -503,6 +715,15 @@ const DB = {
   },
 
   async saveCart(username, items) {
+    if (useSupabase) {
+      try {
+        const { error } = await supabase.from("cart").upsert({ username, items });
+        if (error) throw error;
+        return true;
+      } catch (err) {
+        console.error("Supabase saveCart failed, falling back:", err.message);
+      }
+    }
     if (useSQLite) {
       const itemsStr = JSON.stringify(items);
       return new Promise((resolve, reject) => {
@@ -523,7 +744,7 @@ const DB = {
       return true;
     }
   }
-};
+};;
 
 const getRequestBody = (req) => {
   return new Promise((resolve, reject) => {
