@@ -540,6 +540,10 @@ const server = http.createServer(async (req, res) => {
     // API Routes
     if (requestUrl.startsWith("/api/")) {
       res.setHeader("Content-Type", "application/json; charset=utf-8");
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+      res.setHeader("Surrogate-Control", "no-store");
 
       // GET /api/categories
       if (requestUrl === "/api/categories" && req.method === "GET") {
