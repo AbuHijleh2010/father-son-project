@@ -86,7 +86,7 @@
           <button
             class="hero-btn"
             style="background: #ef4444; width: auto"
-            onclick="logout()"
+            onclick="if (typeof window.logout === 'function') { window.logout(); } else if (typeof logout === 'function') { logout(); } else { localStorage.removeItem('admin_auth'); location.reload(); }"
           >
             تسجيل الخروج
           </button>
@@ -355,7 +355,16 @@
             <span>تسجيل الخروج</span>
             <i data-lucide="log-out" style="width: 18px"></i>
           `;
-          adminNavButton.onclick = logout;
+          adminNavButton.onclick = () => {
+            if (typeof window.logout === 'function') {
+              window.logout();
+            } else if (typeof logout === 'function') {
+              logout();
+            } else {
+              localStorage.removeItem("admin_auth");
+              location.reload();
+            }
+          };
         } else {
           adminNavButton.innerHTML = `
             <span>العودة للصفحة</span>
