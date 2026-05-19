@@ -118,15 +118,7 @@ const formatTrackOrderItems = (items) => {
     .join("، ");
 };
 
-const fetchOrders = async () => {
-  try {
-    const res = await fetch("/api/orders");
-    return await res.json();
-  } catch (err) {
-    console.error("Failed to fetch orders:", err);
-    return [];
-  }
-};
+
 
 async function trackOrder() {
   const id = document.getElementById("orderIdInput").value.trim();
