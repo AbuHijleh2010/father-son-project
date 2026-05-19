@@ -296,8 +296,8 @@ const renderProductsList = (list) => {
 
 const renderProducts = async () => {
   const products = await fetchProducts();
-  // Filter for featured products on home page (e.g. limit to 4 products)
-  renderProductsList(products.slice(0, 4));
+  // Filter for featured products on home page (e.g. limit to 4 latest products)
+  renderProductsList(products.slice().reverse().slice(0, 4));
 };
 
 // Home initialization
