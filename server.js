@@ -725,6 +725,10 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(port, () => {
-  console.log(`Static server running at http://localhost:${port}`);
-});
+if (require.main === module) {
+  server.listen(port, () => {
+    console.log(`Static server running at http://localhost:${port}`);
+  });
+}
+
+module.exports = server;
