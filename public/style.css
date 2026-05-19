@@ -1268,6 +1268,48 @@ th { color: var(--text-muted); }
   .glass > div[style*="display: grid"][style*="gap: 10px"] {
     grid-template-columns: 1fr !important;
   }
+  
+  /* Admin Dashboard Layout Responsiveness Fixes */
+  #dashboardView > div:first-child {
+    flex-direction: column !important;
+    gap: 15px !important;
+    align-items: stretch !important;
+    text-align: center !important;
+  }
+  
+  #dashboardView > div:first-child button {
+    width: 100% !important;
+    margin-top: 5px;
+  }
+  
+  #dashboardView .glass {
+    padding: 20px 14px !important;
+    border-radius: var(--radius-md) !important;
+    margin: 24px 0 !important;
+  }
+  
+  .admin-form-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+  
+  .admin-form-grid .field-group--full {
+    grid-column: 1 / -1 !important;
+  }
+  
+  .admin-form-actions {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  
+  .admin-form-actions .hero-btn {
+    width: 100% !important;
+  }
+  
+  table th, table td {
+    padding: 10px 8px !important;
+    font-size: 0.85rem !important;
+  }
 }
 
 /* Medium Phones (max-width: 576px) */
