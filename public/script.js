@@ -235,7 +235,7 @@ const renderCart = () => {
             <img src="${item.image || fallbackImage}" class="cart-item-img" alt="${item.title}" onerror="this.src='${fallbackImage}'">
             <div style="flex: 1">
                 <h4 style="font-size: 0.9rem; margin-bottom: 5px;">${item.title}</h4>
-                <p style="color: var(--secondary); font-weight: 700;">${item.price.toFixed(2)}$</p>
+                <p style="color: var(--secondary); font-weight: 700;">${Number(item.price || 0).toFixed(2)}$</p>
                 ${item.size ? `<p style="font-size: 0.8rem; color: var(--text-muted); margin: 4px 0;">الحجم: ${item.size}</p>` : ""}
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
                     <div style="display: flex; align-items: center; gap: 8px;">
@@ -253,7 +253,7 @@ const renderCart = () => {
 
   if (footer) footer.style.display = "block";
   const total = cartItems.reduce(
-    (acc, item) => acc + item.price * (item.quantity || 1),
+    (acc, item) => acc + Number(item.price || 0) * (item.quantity || 1),
     0,
   );
   if (totalEl) totalEl.innerText = `${total.toFixed(2)}$`;
@@ -305,7 +305,7 @@ const addToCart = async (event, id) => {
   try {
     const res = await fetch("/api/products");
     const products = await res.json();
-    const product = products.find((p) => p.id === id);
+    const product = products.find((p) => p.id == id);
     if (!product) {
       if (button) {
         button.disabled = false;
