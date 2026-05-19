@@ -318,9 +318,17 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
+const scrollToProducts = () => {
+  const section = document.getElementById("productsSection");
+  if (section) {
+    section.scrollIntoView({ behavior: "smooth" });
+  }
+};
+
 // Bind to window for inline events
 window.handleCategoryClick = handleCategoryClick;
 window.handleCardGlow = handleCardGlow;
+window.scrollToProducts = scrollToProducts;
 window.handleSizeSelect = handleSizeSelect;
   </script>
 </body>
