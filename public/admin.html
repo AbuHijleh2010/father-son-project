@@ -343,77 +343,425 @@
       </div>
     </main>
 
-    <script src="script.js?v=4"></script>
+    <script src="script.js?v=5"></script>
     <script>
-      // Specific logic for admin page
-      let adminNavButton;
+// Specific logic for the Admin Panel (admin.html)
 
-      const setAdminNavButton = (isLoggedIn) => {
-        if (!adminNavButton) return;
-        if (isLoggedIn) {
-          adminNavButton.innerHTML = `
-            <span>تسجيل الخروج</span>
-            <i data-lucide="log-out" style="width: 18px"></i>
-          `;
-          adminNavButton.onclick = () => {
-            if (typeof window.logout === 'function') {
-              window.logout();
-            } else if (typeof logout === 'function') {
-              logout();
-            } else {
-              localStorage.removeItem("admin_auth");
-              location.reload();
-            }
-          };
-        } else {
-          adminNavButton.innerHTML = `
-            <span>العودة للصفحة</span>
-            <i data-lucide="arrow-right" style="width: 18px"></i>
-          `;
-          adminNavButton.onclick = () => {
-            window.location.href = "index.html";
-          };
-        }
-        adminNavButton.style.display = "inline-flex";
-        if (typeof lucide !== "undefined") lucide.createIcons();
-      };
+let adminNavButton;
+let adminOrderFilter = "all";
 
-      document.addEventListener("DOMContentLoaded", () => {
-        adminNavButton = document.getElementById("logoutBtn");
-        const isAdmin = localStorage.getItem("admin_auth") === "true";
-        setAdminNavButton(isAdmin);
-        if (isAdmin) {
-          showDashboard();
-        }
-      });
+const orderStatusFlow = [
+  "تم استلام الطلب",
+  "قيد التجهيز",
+  "تم الشحن",
+  "في الطريق إليك",
+  "تم التوصيل",
+];
 
-      function login() {
-        const pass = document.getElementById("adminPassword").value;
-        const errorEl = document.getElementById("loginError");
-        if (errorEl) {
-          errorEl.style.display = "none";
-          errorEl.innerText = "كلمة المرور غير صحيحة!";
-        }
-
-        if (pass === "admin123") {
-          localStorage.setItem("admin_auth", "true");
-          window.location.href = "admin.html";
-        } else {
-          if (errorEl) errorEl.style.display = "block";
-        }
+const setAdminNavButton = (isLoggedIn) => {
+  if (!adminNavButton) return;
+  if (isLoggedIn) {
+    adminNavButton.innerHTML = `
+      <span>تسجيل الخروج</span>
+      <i data-lucide="log-out" style="width: 18px"></i>
+    `;
+    adminNavButton.onclick = () => {
+      if (typeof window.logout === "function") {
+        window.logout();
+      } else if (typeof logout === "function") {
+        logout();
+      } else {
+        localStorage.removeItem("admin_auth");
+        location.reload();
       }
+    };
+  } else {
+    adminNavButton.innerHTML = `
+      <span>العودة للصفحة</span>
+      <i data-lucide="arrow-right" style="width: 18px"></i>
+    `;
+    adminNavButton.onclick = () => {
+      window.location.href = "index.html";
+    };
+  }
+  adminNavButton.style.display = "inline-flex";
+  if (typeof lucide !== "undefined") lucide.createIcons();
+};
 
-      function showDashboard() {
-        document.getElementById("loginView").style.display = "none";
-        document.getElementById("dashboardView").style.display = "block";
-        if (adminNavButton) adminNavButton.style.display = "block";
-        try {
-          renderAdminProducts();
-          renderAdminOrders();
-        } catch (error) {
-          console.error("renderAdminProducts failed:", error);
-        }
+function login() {
+  const pass = document.getElementById("adminPassword").value;
+  const errorEl = document.getElementById("loginError");
+  if (errorEl) {
+    errorEl.style.display = "none";
+    errorEl.innerText = "كلمة المرور غير صحيحة!";
+  }
+
+  if (pass === "admin123") {
+    localStorage.setItem("admin_auth", "true");
+    window.location.href = "admin.html";
+  } else {
+    if (errorEl) errorEl.style.display = "block";
+  }
+}
+
+function showDashboard() {
+  const loginView = document.getElementById("loginView");
+  const dashboardView = document.getElementById("dashboardView");
+  if (loginView) loginView.style.display = "none";
+  if (dashboardView) dashboardView.style.display = "block";
+  if (adminNavButton) adminNavButton.style.display = "block";
+  try {
+    renderAdminProducts();
+    renderAdminOrders();
+  } catch (error) {
+    console.error("Dashboard render failed:", error);
+  }
+}
+
+const renderAdminProducts = async () => {
+  const body = document.getElementById("adminProductsBody");
+  const statsContainer = document.getElementById("adminStats");
+  if (!body && !statsContainer) return;
+
+  const products = await fetchProducts();
+
+  if (body) {
+    if (products.length === 0) {
+      body.innerHTML = `
+            <tr>
+                <td colspan="8" style="padding: 24px; text-align: center; color: var(--text-muted);">
+                    لا توجد منتجات حالياً. أضف منتجات جديدة من النموذج أعلاه.
+                </td>
+            </tr>
+        `;
+    } else {
+      body.innerHTML = products
+        .map(
+          (p) => `
+            <tr>
+                <td><img src="${p.image || fallbackImage}" width="50" style="border-radius: 5px;" onerror="this.src='${fallbackImage}'"></td>
+                <td>${p.title}</td>
+                <td>${p.price}$</td>
+                <td>${p.quantity ?? 0}</td>
+                <td>${p.discount ?? 0}%</td>
+                <td>${p.type === "father" ? "أب" : "طفل"}</td>
+                <td>${Array.isArray(p.sizes) ? p.sizes.join("، ") : ""}</td>
+                <td>
+                    <button onclick="populateProductForm(${p.id})" style="color: #0ea5e9; background: none; border: none; cursor: pointer; margin-right: 10px;">تعديل</button>
+                    <button onclick="deleteProduct(${p.id})" style="color: #ef4444; background: none; border: none; cursor: pointer;">حذف</button>
+                </td>
+            </tr>
+        `,
+        )
+        .slice()
+        .reverse()
+        .join("");
+    }
+  }
+
+  if (statsContainer) {
+    const fathers = products.filter((p) => p.type === "father").length;
+    const children = products.filter((p) => p.type === "child").length;
+    const sizeCount = products.reduce(
+      (acc, p) => acc + (Array.isArray(p.sizes) ? p.sizes.length : 0),
+      0,
+    );
+    statsContainer.innerHTML = `
+            <div class="admin-stat-card">
+                <span>إجمالي المنتجات</span>
+                <strong>${products.length}</strong>
+            </div>
+            <div class="admin-stat-card">
+                <span>منتجات الأب</span>
+                <strong>${fathers}</strong>
+            </div>
+            <div class="admin-stat-card">
+                <span>منتجات الطفل</span>
+                <strong>${children}</strong>
+            </div>
+            <div class="admin-stat-card">
+                <span>عدد الأحجام</span>
+                <strong>${sizeCount}</strong>
+            </div>
+        `;
+  }
+};
+
+const formatOrderItems = (items) => {
+  if (!Array.isArray(items) || items.length === 0)
+    return "لم يتم تضمين تفاصيل المنتج.";
+  return items
+    .map(
+      (item) =>
+        `${item.title} ×${item.quantity || 1}${item.size ? ` (${item.size})` : ""}`,
+    )
+    .join("، ");
+};
+
+const getNextOrderStatus = (currentStatus) => {
+  if (currentStatus === "قيد التجهيز" || currentStatus === "في الانتظار") return "تم استلام الطلب";
+  const index = orderStatusFlow.indexOf(currentStatus);
+  if (index === -1 || index === orderStatusFlow.length - 1)
+    return currentStatus;
+  return orderStatusFlow[index + 1];
+};
+
+const advanceOrderStatus = async (orderId) => {
+  try {
+    const res = await fetch("/api/orders");
+    const orders = await res.json();
+    const order = orders.find((o) => o.id === orderId);
+    if (!order) return;
+
+    const current = order.status;
+    let next = "";
+    if (current === "تم استلام الطلب") next = "قيد التجهيز";
+    else if (current === "قيد التجهيز") next = "تم الشحن";
+    else if (current === "تم الشحن") next = "في الطريق إليك";
+    else if (current === "في الطريق إليك") next = "تم التوصيل";
+    else {
+      showToast("لا يمكن تحديث حالة الطلب أكثر من ذلك");
+      return;
+    }
+
+    const response = await fetch("/api/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "updateStatus", id: orderId, status: next }),
+    });
+
+    if (response.ok) {
+      renderAdminOrders();
+      showToast(`تم تحديث حالة الطلب إلى ${next}`);
+    }
+  } catch (err) {
+    console.error("Failed to advance order status:", err);
+  }
+};
+
+const setAdminOrderFilter = (filter) => {
+  adminOrderFilter = filter;
+  renderAdminOrders();
+};
+
+const renderAdminOrders = async () => {
+  const body = document.getElementById("adminOrdersBody");
+  const badge = document.getElementById("adminOrdersBadge");
+  if (!body && !badge) return;
+
+  try {
+    const res = await fetch("/api/orders");
+    const orders = await res.json();
+    const pendingCount = orders.filter((o) => o.status !== "تم التوصيل").length;
+    const filteredOrders =
+      adminOrderFilter === "pending"
+        ? orders.filter((o) => o.status !== "تم التوصيل")
+        : orders;
+
+    if (body) {
+      if (orders.length === 0) {
+        body.innerHTML = `
+              <tr>
+                  <td colspan="8" style="padding: 24px; text-align: center; color: var(--text-muted);">
+                      لا توجد طلبات حالياً.
+                  </td>
+              </tr>
+          `;
+      } else if (filteredOrders.length === 0) {
+        body.innerHTML = `
+              <tr>
+                  <td colspan="8" style="padding: 24px; text-align: center; color: var(--text-muted);">
+                      لا توجد طلبات في الفلتر الحالي.
+                  </td>
+              </tr>
+          `;
+      } else {
+        body.innerHTML = filteredOrders
+          .slice()
+          .reverse()
+          .map(
+            (order) => `
+              <tr>
+                  <td>${order.id}</td>
+                  <td>${order.name || "غير معروف"}</td>
+                  <td>${order.phone || "غير متوفر"}</td>
+                  <td>${order.status}</td>
+                  <td>${order.total}$</td>
+                  <td>${new Date(order.created_at || order.date || "").toLocaleDateString("ar-EG", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })}</td>
+                  <td style="text-align: left; max-width: 420px; white-space: normal;">
+                    ${formatOrderItems(order.items)}
+                  </td>
+                  <td>
+                    <button
+                      class="hero-btn"
+                      style="background: rgba(59,130,246,0.12); color: #2563eb; width: auto;"
+                      onclick="advanceOrderStatus('${order.id}')"
+                      ${order.status === "تم التوصيل" ? "disabled" : ""}
+                    >
+                      ${order.status === "تم التوصيل" ? "مكتمل" : "تحديث الحالة"}
+                    </button>
+                  </td>
+              </tr>
+          `,
+          )
+          .join("");
       }
+    }
+
+    if (badge) {
+      badge.innerText = pendingCount
+        ? `طلبات جديدة: ${pendingCount}`
+        : "لا توجد طلبات جديدة";
+    }
+  } catch (err) {
+    console.error("Failed to render admin orders:", err);
+  }
+};
+
+const populateProductForm = async (id) => {
+  const products = await fetchProducts();
+  const product = products.find((p) => p.id == id);
+  if (!product) return;
+
+  document.getElementById("pTitle").value = product.title || "";
+  document.getElementById("pPrice").value = product.price || "";
+  document.getElementById("pImage").value = product.image || "";
+  document.getElementById("pType").value = product.type || "father";
+  document.getElementById("pMatch").value = product.match_id || "";
+  document.getElementById("pSizes").value = Array.isArray(product.sizes)
+    ? product.sizes.join(",")
+    : "";
+  document.getElementById("pQuantity").value = product.quantity ?? 0;
+  document.getElementById("pDiscount").value = product.discount ?? 0;
+  document.getElementById("pDesc").value = product.description || "";
+  document.getElementById("pId").value = product.id;
+
+  document.getElementById("formTitle").innerText = "تعديل المنتج";
+  document.getElementById("submitBtn").innerText = "حفظ التعديلات";
+  const cancelBtn = document.getElementById("cancelBtn");
+  if (cancelBtn) cancelBtn.style.display = "inline-flex";
+
+  const formSection = document.querySelector(".admin-form-grid");
+  formSection?.scrollIntoView({ behavior: "smooth", block: "start" });
+};
+
+const cancelEdit = () => {
+  document.getElementById("pId").value = "";
+  document.getElementById("pTitle").value = "";
+  document.getElementById("pPrice").value = "";
+  document.getElementById("pImage").value = "";
+  document.getElementById("pType").value = "father";
+  document.getElementById("pMatch").value = "";
+  document.getElementById("pSizes").value = "";
+  document.getElementById("pQuantity").value = "0";
+  document.getElementById("pDiscount").value = "0";
+  document.getElementById("pDesc").value = "";
+
+  document.getElementById("formTitle").innerText = "إضافة منتج جديد";
+  document.getElementById("submitBtn").innerText = "إضافة المنتج";
+  const cancelBtn = document.getElementById("cancelBtn");
+  if (cancelBtn) cancelBtn.style.display = "none";
+};
+
+const addProduct = async () => {
+  const id = document.getElementById("pId")?.value;
+  const title = document.getElementById("pTitle")?.value;
+  const price = parseFloat(document.getElementById("pPrice")?.value || "0");
+  const image = document.getElementById("pImage")?.value;
+  const type = document.getElementById("pType")?.value;
+  const match_id = parseInt(document.getElementById("pMatch")?.value || "0", 10);
+  const description = document.getElementById("pDesc")?.value;
+  const sizesInput = document.getElementById("pSizes")?.value || "";
+  const quantity = parseInt(document.getElementById("pQuantity")?.value || "0", 10);
+  const discount = parseInt(document.getElementById("pDiscount")?.value || "0", 10);
+
+  const sizes = sizesInput
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  if (!title || !price || Number.isNaN(price)) {
+    return alert("يرجى إدخال العنوان والسعر بشكل صحيح");
+  }
+
+  const payload = {
+    title,
+    price,
+    image,
+    type,
+    category_id: type === "father" ? 2 : 3, // auto category selection
+    match_id,
+    sizes,
+    description,
+    quantity: Number.isFinite(quantity) ? quantity : 0,
+    discount: Number.isFinite(discount) ? discount : 0,
+  };
+
+  if (id) {
+    payload.id = id;
+  }
+
+  try {
+    const response = await fetch("/api/products", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+
+    if (response.ok) {
+      renderAdminProducts();
+      cancelEdit();
+      alert(id ? "تم تحديث المنتج بنجاح" : "تمت إضافة المنتج!");
+    } else {
+      alert("حدث خطأ أثناء حفظ المنتج");
+    }
+  } catch (err) {
+    console.error("Failed to save product:", err);
+    alert("فشل الاتصال بالخادم");
+  }
+};
+
+const deleteProduct = async (id) => {
+  if (!confirm("هل أنت متأكد؟")) return;
+  try {
+    const response = await fetch(`/api/products?id=${id}`, {
+      method: "DELETE",
+    });
+    if (response.ok) {
+      renderAdminProducts();
+    } else {
+      alert("فشل حذف المنتج");
+    }
+  } catch (err) {
+    console.error("Failed to delete product:", err);
+  }
+};
+
+// Admin page initialization
+document.addEventListener("DOMContentLoaded", () => {
+  adminNavButton = document.getElementById("logoutBtn");
+  const isAdmin = localStorage.getItem("admin_auth") === "true";
+  setAdminNavButton(isAdmin);
+  if (isAdmin) {
+    showDashboard();
+  }
+});
+
+// Bind to window for inline events
+window.login = login;
+window.addProduct = addProduct;
+window.cancelEdit = cancelEdit;
+window.populateProductForm = populateProductForm;
+window.renderAdminProducts = renderAdminProducts;
+window.renderAdminOrders = renderAdminOrders;
+window.advanceOrderStatus = advanceOrderStatus;
+window.setAdminOrderFilter = setAdminOrderFilter;
+window.deleteProduct = deleteProduct;
+
     </script>
   </body>
 </html>

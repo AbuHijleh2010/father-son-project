@@ -76,42 +76,46 @@
       </div>
     </main>
 
-    <script src="script.js?v=4"></script>
+    <script src="script.js?v=5"></script>
     <script>
-      const renderAccount = () => {
-        const user = JSON.parse(localStorage.getItem("shopUser") || "null");
-        const greeting = document.getElementById("accountGreeting");
-        const usernameEl = document.getElementById("accountUsername");
-        const logoutBtn = document.getElementById("logoutBtn");
-        const shopBtn = document.getElementById("shopBtn");
+// Specific logic for Account page (account.html)
 
-        if (!user) {
-          greeting.innerText =
-            "لم يتم تسجيل الدخول بعد. يرجى تسجيل الدخول أولاً.";
-          usernameEl.innerText = "ضيف";
-          shopBtn.innerText = "زيارة الموقع";
-          shopBtn.onclick = () => (window.location.href = "index.html");
-          logoutBtn.innerText = "العودة لتسجيل الدخول";
-          logoutBtn.onclick = () => (window.location.href = "login.html");
-          return;
-        }
+const renderAccount = () => {
+  const user = getLoggedInUser();
+  const greeting = document.getElementById("accountGreeting");
+  const usernameEl = document.getElementById("accountUsername");
+  const logoutBtn = document.getElementById("logoutBtn");
+  const shopBtn = document.getElementById("shopBtn");
 
-        greeting.innerText = `مرحباً ${user.username}! يمكنك هنا إدارة حسابك.`;
-        usernameEl.innerText = user.username;
-        const accountEmailEl = document.getElementById("accountEmail");
-        if (accountEmailEl) accountEmailEl.innerText = user.email || "–";
-        shopBtn.innerText = "زيارة الموقع الآن";
-        shopBtn.onclick = () => (window.location.href = "index.html");
-        logoutBtn.onclick = () => {
-          logout();
-          window.location.href = "index.html";
-        };
-      };
+  if (!greeting || !usernameEl || !logoutBtn || !shopBtn) return;
 
-      document.addEventListener("DOMContentLoaded", () => {
-        renderAccount();
-        if (typeof lucide !== "undefined") lucide.createIcons();
-      });
+  if (!user) {
+    greeting.innerText = "لم يتم تسجيل الدخول بعد. يرجى تسجيل الدخول أولاً.";
+    usernameEl.innerText = "ضيف";
+    shopBtn.innerText = "زيارة الموقع";
+    shopBtn.onclick = () => (window.location.href = "index.html");
+    logoutBtn.innerText = "العودة لتسجيل الدخول";
+    logoutBtn.onclick = () => (window.location.href = "login.html");
+    return;
+  }
+
+  greeting.innerText = `مرحباً ${user.username}! يمكنك هنا إدارة حسابك.`;
+  usernameEl.innerText = user.username;
+  const accountEmailEl = document.getElementById("accountEmail");
+  if (accountEmailEl) accountEmailEl.innerText = user.email || "–";
+  shopBtn.innerText = "زيارة الموقع الآن";
+  shopBtn.onclick = () => (window.location.href = "index.html");
+  logoutBtn.onclick = () => {
+    logout();
+    window.location.href = "index.html";
+  };
+};
+
+document.addEventListener("DOMContentLoaded", () => {
+  renderAccount();
+  if (typeof lucide !== "undefined") lucide.createIcons();
+});
+
     </script>
   </body>
 </html>

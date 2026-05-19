@@ -233,7 +233,157 @@
       </div>
     </footer>
 
-    <script src="script.js?v=4"></script>
+    <script src="script.js?v=5"></script>
+    <script>
+// Specific logic for the Home page (index.html)
+
+let selectedCategory = null;
+
+const renderCategories = async () => {
+  const container = document.getElementById("categoriesContainer");
+  if (!container) return;
+  const categories = await fetchCategories();
+  container.innerHTML = categories
+    .map(
+      (cat) => `
+        <div class="category-card glass ${selectedCategory === cat.id ? "active" : ""}" onclick="handleCategoryClick(${cat.id})">
+            <span class="cat-icon">${cat.icon}</span>
+            <span style="font-weight: 600">${cat.name}</span>
+        </div>
+    `,
+    )
+    .join("");
+};
+
+const handleCategoryClick = (id) => {
+  window.location.href = `shop.html?cat=${id}`;
+};
+
+const handleCardGlow = (e) => {
+  const card = e.currentTarget;
+  const rect = card.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  card.style.setProperty("--mouse-x", `${x}px`);
+  card.style.setProperty("--mouse-y", `${y}px`);
+};
+
+const handleSizeSelect = (productId, size) => {
+  selectedSizes[productId] = size;
+  saveSelectedSizes();
+  const sizeButtons = document.querySelectorAll(
+    `[data-product-id="${productId}"]`,
+  );
+  sizeButtons.forEach((btn) => {
+    if (btn.innerText.trim() === size) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
+  });
+};
+
+const renderProductsList = (list) => {
+  const container = document.getElementById("productsContainer");
+  if (!container) return;
+
+  if (list.length === 0) {
+    container.innerHTML = `
+      <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted);">
+        لا توجد منتجات مطابقة للبحث أو الفئة المختارة.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = list
+    .map((product) => {
+      const pId = product.id;
+      const isOutOfStock = (product.quantity || 0) <= 0;
+      const activeSize = normalizeSize(selectedSizes[pId]) || getSelectedSize(product);
+      const isPromo = product.discount && product.discount > 0;
+      const finalPrice = isPromo
+        ? product.price * (1 - product.discount / 100)
+        : product.price;
+
+      const sizeButtons =
+        product.sizes && product.sizes.length > 0
+          ? `<div class="product-sizes" style="display: flex; gap: 8px; justify-content: center; margin: 12px 0;">
+              ${product.sizes
+                .map(
+                  (sz) => `
+                  <button 
+                      class="size-btn ${activeSize === sz ? "active" : ""}" 
+                      data-product-id="${pId}" 
+                      onclick="handleSizeSelect(${pId}, '${sz}')"
+                  >${sz}</button>
+              `,
+                )
+                .join("")}
+             </div>`
+          : "";
+
+      return `
+        <div class="product-card glass" onmousemove="handleCardGlow(event)">
+            ${isPromo ? `<span class="promo-badge">خصم ${product.discount}%</span>` : ""}
+            <div class="product-img-wrapper">
+                <img src="${product.image || fallbackImage}" class="product-img" alt="${product.title}" onerror="this.src='${fallbackImage}'">
+            </div>
+            <div class="product-info">
+                <h3>${product.title}</h3>
+                <p class="product-desc">${product.description || ""}</p>
+                ${sizeButtons}
+                <div class="product-footer">
+                    <div class="price-wrapper">
+                        ${
+                          isPromo
+                            ? `<span class="old-price">${product.price.toFixed(2)}$</span>
+                               <span class="price">${finalPrice.toFixed(2)}$</span>`
+                            : `<span class="price">${product.price.toFixed(2)}$</span>`
+                        }
+                    </div>
+                    ${
+                      isOutOfStock
+                        ? `<button class="hero-btn disabled" disabled style="padding: 8px 16px; font-size: 0.9rem; background: var(--text-muted)">نفذ من المخزن</button>`
+                        : `<button class="hero-btn" onclick="addToCart(event, ${pId})" style="padding: 8px 16px; font-size: 0.9rem;">أضف للسلة</button>`
+                    }
+                </div>
+            </div>
+        </div>
+      `;
+    })
+    .join("");
+};
+
+const renderProducts = async () => {
+  const products = await fetchProducts();
+  // Filter for featured products on home page (e.g. limit to 4 products)
+  renderProductsList(products.slice(0, 4));
+};
+
+// Home initialization
+document.addEventListener("DOMContentLoaded", () => {
+  renderCategories();
+  renderProducts();
+
+  const searchInput = document.getElementById("searchInput");
+  if (searchInput) {
+    searchInput.addEventListener("keypress", (e) => {
+      if (e.key === "Enter") {
+        const query = searchInput.value.trim();
+        if (query) {
+          window.location.href = `shop.html?search=${encodeURIComponent(query)}`;
+        }
+      }
+    });
+  }
+});
+
+// Bind to window for inline events
+window.handleCategoryClick = handleCategoryClick;
+window.handleCardGlow = handleCardGlow;
+window.handleSizeSelect = handleSizeSelect;
+
+    </script>
   </body>
 </html>
-w

@@ -188,16 +188,277 @@
       </div>
     </footer>
 
-    <script src="script.js?v=4"></script>
+    <script src="script.js?v=5"></script>
     <script>
-      // Store page specific logic
-      document.addEventListener("DOMContentLoaded", () => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const catId = urlParams.get("cat");
-        if (catId) {
-          setTimeout(() => filterByCategory(parseInt(catId)), 600);
-        }
-      });
+// Specific logic for the Shop page (shop.html)
+
+let selectedCategory = null;
+
+const categorySynonyms = {
+  تيشيرت: "بلايز",
+  قميص: "بلايز",
+  بلوزة: "بلايز",
+  بنطلون: "جينز",
+  سروال: "جينز",
+  جينز: "جينز",
+  طقم: "أطقم كاملة",
+  أأطقم: "أطقم كاملة",
+  حذاء: "أحذية",
+  أحذية: "أحذية",
+  ساعة: "إكسسوارات",
+  حقيبة: "إكسسوارات",
+  عقد: "إكسسوارات",
+  تخفيض: "تخفيضات",
+  خصم: "تخفيضات",
+};
+
+const findCategoryByQuery = async (query) => {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return null;
+
+  const categories = await fetchCategories();
+  const exactSynonym = Object.entries(categorySynonyms).find(([key]) =>
+    normalizedQuery.includes(key),
+  );
+  if (exactSynonym) {
+    const catName = exactSynonym[1];
+    return (
+      categories.find((cat) => cat.name.toLowerCase() === catName.toLowerCase())
+        ?.id || null
+    );
+  }
+
+  const matchingCategory = categories.find((cat) =>
+    cat.name.toLowerCase().includes(normalizedQuery),
+  );
+  return matchingCategory?.id || null;
+};
+
+const searchMatches = async (product, query) => {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return true;
+
+  const categories = await fetchCategories();
+  const categoryName =
+    categories.find((c) => c.id === product.category_id)?.name || "";
+  const fields = [
+    product.title,
+    product.description,
+    product.type,
+    categoryName,
+    product.price?.toString(),
+  ];
+  return fields.some(
+    (field) => field && field.toLowerCase().includes(normalizedQuery),
+  );
+};
+
+const renderCategories = async () => {
+  const container = document.getElementById("categoriesContainer");
+  if (!container) return;
+  const categories = await fetchCategories();
+  container.innerHTML = categories
+    .map(
+      (cat) => `
+        <div class="category-card glass ${selectedCategory === cat.id ? "active" : ""}" onclick="handleCategoryClick(${cat.id})">
+            <span class="cat-icon">${cat.icon}</span>
+            <span style="font-weight: 600">${cat.name}</span>
+        </div>
+    `,
+    )
+    .join("");
+};
+
+const handleCategoryClick = (id) => {
+  filterByCategory(id);
+};
+
+const handleCardGlow = (e) => {
+  const card = e.currentTarget;
+  const rect = card.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  card.style.setProperty("--mouse-x", `${x}px`);
+  card.style.setProperty("--mouse-y", `${y}px`);
+};
+
+const handleSizeSelect = (productId, size) => {
+  selectedSizes[productId] = size;
+  saveSelectedSizes();
+  const sizeButtons = document.querySelectorAll(
+    `[data-product-id="${productId}"]`,
+  );
+  sizeButtons.forEach((btn) => {
+    if (btn.innerText.trim() === size) {
+      btn.classList.add("active");
+    } else {
+      btn.classList.remove("active");
+    }
+  });
+};
+
+const renderProductsList = (list) => {
+  const container = document.getElementById("productsContainer");
+  if (!container) return;
+
+  if (list.length === 0) {
+    container.innerHTML = `
+      <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted);">
+        لا توجد منتجات مطابقة للبحث أو الفئة المختارة.
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = list
+    .map((product) => {
+      const pId = product.id;
+      const isOutOfStock = (product.quantity || 0) <= 0;
+      const activeSize = normalizeSize(selectedSizes[pId]) || getSelectedSize(product);
+      const isPromo = product.discount && product.discount > 0;
+      const finalPrice = isPromo
+        ? product.price * (1 - product.discount / 100)
+        : product.price;
+
+      const sizeButtons =
+        product.sizes && product.sizes.length > 0
+          ? `<div class="product-sizes" style="display: flex; gap: 8px; justify-content: center; margin: 12px 0;">
+              ${product.sizes
+                .map(
+                  (sz) => `
+                  <button 
+                      class="size-btn ${activeSize === sz ? "active" : ""}" 
+                      data-product-id="${pId}" 
+                      onclick="handleSizeSelect(${pId}, '${sz}')"
+                  >${sz}</button>
+              `,
+                )
+                .join("")}
+             </div>`
+          : "";
+
+      return `
+        <div class="product-card glass" onmousemove="handleCardGlow(event)">
+            ${isPromo ? `<span class="promo-badge">خصم ${product.discount}%</span>` : ""}
+            <div class="product-img-wrapper">
+                <img src="${product.image || fallbackImage}" class="product-img" alt="${product.title}" onerror="this.src='${fallbackImage}'">
+            </div>
+            <div class="product-info">
+                <h3>${product.title}</h3>
+                <p class="product-desc">${product.description || ""}</p>
+                ${sizeButtons}
+                <div class="product-footer">
+                    <div class="price-wrapper">
+                        ${
+                          isPromo
+                            ? `<span class="old-price">${product.price.toFixed(2)}$</span>
+                               <span class="price">${finalPrice.toFixed(2)}$</span>`
+                            : `<span class="price">${product.price.toFixed(2)}$</span>`
+                        }
+                    </div>
+                    ${
+                      isOutOfStock
+                        ? `<button class="hero-btn disabled" disabled style="padding: 8px 16px; font-size: 0.9rem; background: var(--text-muted)">نفذ من المخزن</button>`
+                        : `<button class="hero-btn" onclick="addToCart(event, ${pId})" style="padding: 8px 16px; font-size: 0.9rem;">أضف للسلة</button>`
+                    }
+                </div>
+            </div>
+        </div>
+      `;
+    })
+    .join("");
+};
+
+const filterByCategory = async (catId) => {
+  selectedCategory = catId;
+  renderCategories();
+  const products = await fetchProducts();
+  const filtered = products.filter((p) => p.category_id === catId);
+  const categories = await fetchCategories();
+  const catName = categories.find((c) => c.id === catId)?.name || "";
+
+  const indicator = document.getElementById("filterIndicator");
+  if (indicator) {
+    indicator.innerHTML = `
+      الفئة: <strong>${catName}</strong>
+      <button onclick="clearCategoryFilter()" class="clear-filter-btn">&times;</button>
+    `;
+    indicator.style.display = "inline-flex";
+  }
+  renderProductsList(filtered);
+};
+
+const clearCategoryFilter = () => {
+  selectedCategory = null;
+  renderCategories();
+  const indicator = document.getElementById("filterIndicator");
+  if (indicator) {
+    indicator.style.display = "none";
+  }
+  renderProducts();
+};
+
+const handleSearchInput = async (val) => {
+  const query = val.trim();
+  const indicator = document.getElementById("filterIndicator");
+  if (indicator) indicator.style.display = "none";
+  selectedCategory = null;
+  renderCategories();
+
+  const products = await fetchProducts();
+  if (!query) {
+    renderProductsList(products);
+    return;
+  }
+
+  const catId = await findCategoryByQuery(query);
+  const filtered = [];
+  for (const p of products) {
+    const isMatch = await searchMatches(p, query);
+    if (isMatch || (catId !== null && p.category_id === catId)) {
+      filtered.push(p);
+    }
+  }
+  renderProductsList(filtered);
+};
+
+const renderProducts = async () => {
+  const products = await fetchProducts();
+  renderProductsList(products);
+};
+
+// Shop initialization
+document.addEventListener("DOMContentLoaded", async () => {
+  await renderCategories();
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const catId = urlParams.get("cat");
+  const searchQuery = urlParams.get("search");
+
+  if (catId) {
+    filterByCategory(parseInt(catId, 10));
+  } else if (searchQuery) {
+    const searchInput = document.getElementById("searchInput");
+    if (searchInput) searchInput.value = searchQuery;
+    handleSearchInput(searchQuery);
+  } else {
+    renderProducts();
+  }
+
+  const searchInput = document.getElementById("searchInput");
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      handleSearchInput(e.target.value);
+    });
+  }
+});
+
+// Bind to window for inline events
+window.handleCategoryClick = handleCategoryClick;
+window.clearCategoryFilter = clearCategoryFilter;
+window.handleCardGlow = handleCardGlow;
+window.handleSizeSelect = handleSizeSelect;
+
     </script>
   </body>
 </html>

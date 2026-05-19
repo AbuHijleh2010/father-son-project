@@ -56,282 +56,235 @@
       <div id="ordersContainer" style="max-width: 920px; margin: 0 auto"></div>
     </main>
 
-    <script src="script.js?v=4"></script>
+    <script src="script.js?v=5"></script>
     <script>
-      const orderSteps = [
-        "تم استلام الطلب",
-        "جارٍ التجهيز",
-        "تم الشحن",
-        "في الطريق إليك",
-        "تم التوصيل",
-      ];
+// Specific logic for Order Tracking page (track.html)
 
-      const orderStatusMap = {
-        "في الانتظار": 1,
-        "قيد التجهيز": 2,
-        "جارٍ التجهيز": 2,
-        "تم استلام الطلب": 1,
-        "تم الشحن": 3,
-        "في الطريق": 4,
-        "تم التوصيل": 5,
-      };
+const orderSteps = [
+  "تم استلام الطلب",
+  "قيد التجهيز",
+  "تم الشحن",
+  "في الطريق إليك",
+  "تم التوصيل",
+];
 
-      const getLocalStorageJSON = (key, fallback = null) => {
-        try {
-          const value = localStorage.getItem(key);
-          return value ? JSON.parse(value) : fallback;
-        } catch {
-          return fallback;
-        }
-      };
+const orderStatusMap = {
+  "في الانتظار": 1,
+  "قيد التجهيز": 2,
+  "جارٍ التجهيز": 2,
+  "تم استلام الطلب": 1,
+  "تم الشحن": 3,
+  "في الطريق": 4,
+  "تم التوصيل": 5,
+};
 
-      const getLoggedInUser = () => getLocalStorageJSON("shopUser", null);
-      const getOrdersStorage = () => getLocalStorageJSON("orders", []);
+const getOrderStep = (status) => orderStatusMap[status] || 1;
 
-      const getOrderStep = (status) => orderStatusMap[status] || 1;
+const formatOrderDate = (value) => {
+  if (!value) return "-";
+  try {
+    return new Date(value).toLocaleDateString("ar-EG", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  } catch {
+    return value;
+  }
+};
 
-      const formatOrderDate = (value) => {
-        if (!value) return "-";
-        try {
-          return new Date(value).toLocaleDateString("ar-EG", {
-            day: "numeric",
-            month: "long",
-            year: "numeric",
-          });
-        } catch {
-          return value;
-        }
-      };
+const renderOrderSteps = (currentStep) => {
+  return orderSteps
+    .map((label, index) => {
+      const step = index + 1;
+      const done = step <= currentStep;
+      return `
+        <div style="display:flex; align-items:center; gap:12px; padding: 14px 16px; border-radius: 14px; background: ${done ? "rgba(56,189,248,0.18)" : "rgba(255,255,255,0.04)"}; border: 1px solid ${done ? "rgba(56,189,248,0.25)" : "rgba(255,255,255,0.08)"};">
+            <span style="min-width:28px; min-height:28px; display:flex; align-items:center; justify-content:center; border-radius:50%; background: ${done ? "var(--secondary)" : "rgba(255,255,255,0.08)"}; color: ${done ? "#000" : "var(--text-muted)"}; font-weight:700;">${step}</span>
+            <span style="font-weight:600; color: ${done ? "white" : "var(--text-muted)"};">${label}</span>
+        </div>
+      `;
+    })
+    .join("");
+};
 
-      const renderOrderSteps = (currentStep) => {
-        return orderSteps
-          .map((label, index) => {
-            const step = index + 1;
-            const done = step <= currentStep;
-            return `
-                    <div style="display:flex; align-items:center; gap:12px; padding: 14px 16px; border-radius: 14px; background: ${done ? "rgba(56,189,248,0.18)" : "rgba(255,255,255,0.04)"}; border: 1px solid ${done ? "rgba(56,189,248,0.25)" : "rgba(255,255,255,0.08)"};">
-                        <span style="min-width:28px; min-height:28px; display:flex; align-items:center; justify-content:center; border-radius:50%; background: ${done ? "var(--secondary)" : "rgba(255,255,255,0.08)"}; color: ${done ? "#000" : "var(--text-muted)"}; font-weight:700;">${step}</span>
-                        <span style="font-weight:600; color: ${done ? "white" : "var(--text-muted)"};">${label}</span>
-                    </div>
-                `;
-          })
-          .join("");
-      };
+const formatTrackOrderItems = (items) => {
+  if (!Array.isArray(items) || items.length === 0) return "غير متوفر";
+  return items
+    .map(
+      (item) =>
+        `${item.title} ×${item.quantity || 1}${item.size ? ` (${item.size})` : ""}`,
+    )
+    .join("، ");
+};
 
-      const formatTrackOrderItems = (items) => {
-        if (!Array.isArray(items) || items.length === 0) return "غير متوفر";
-        return items
-          .map(
-            (item) =>
-              `${item.title} ×${item.quantity || 1}${item.size ? ` (${item.size})` : ""}`,
-          )
-          .join("، ");
-      };
+const fetchOrders = async () => {
+  try {
+    const res = await fetch("/api/orders");
+    return await res.json();
+  } catch (err) {
+    console.error("Failed to fetch orders:", err);
+    return [];
+  }
+};
 
-      function trackOrder() {
-        const id = document.getElementById("orderIdInput").value.trim();
-        const orders = getOrdersStorage();
-        const normalizedSearch = id.replace(/\s+/g, "");
-        const order = orders.find(
-          (o) =>
-            o.id === id ||
-            o.phone === normalizedSearch ||
-            o.email?.toLowerCase() === id.toLowerCase(),
-        );
+async function trackOrder() {
+  const id = document.getElementById("orderIdInput").value.trim();
+  const orders = await fetchOrders();
+  const normalizedSearch = id.replace(/\s+/g, "");
+  const order = orders.find(
+    (o) =>
+      o.id === id ||
+      o.phone === normalizedSearch ||
+      o.email?.toLowerCase() === id.toLowerCase(),
+  );
 
-        if (order) {
-          document.getElementById("orderResult").style.display = "block";
-          document.getElementById("trackError").style.display = "none";
-          document.getElementById("resId").innerText = order.id;
-          document.getElementById("resStatus").innerText = order.status;
-          document.getElementById("resName").innerText = order.name;
-          document.getElementById("resEmail").innerText =
-            order.email || "غير متوفر";
-          document.getElementById("resPhone").innerText =
-            order.phone || "غير متوفر";
-          document.getElementById("resAddress").innerText =
-            order.address || "غير متوفر";
-          document.getElementById("resItems").innerText = formatTrackOrderItems(
-            order.items,
-          );
-          document.getElementById("resTotal").innerText = order.total || "0.00";
-          document.getElementById("resDate").innerText = formatOrderDate(
-            order.created_at || order.date || "",
-          );
-          const currentStep = getOrderStep(order.status);
-          document.getElementById("trackingSteps").innerHTML =
-            renderOrderSteps(currentStep);
-          document.getElementById("resMessage").innerText =
-            order.status === "تم التوصيل"
-              ? "تم تسليم طلبك بنجاح. نتمنى لك استخداماً سعيداً!"
-              : "طلبك تحت المتابعة الآن، وسيتم التواصل معك قريباً عبر رقم الجوال إذا احتجنا أي معلومات إضافية.";
-        } else {
-          document.getElementById("orderResult").style.display = "none";
-          document.getElementById("trackError").style.display = "block";
-        }
-      }
+  if (order) {
+    document.getElementById("orderResult").style.display = "block";
+    document.getElementById("trackError").style.display = "none";
+    document.getElementById("resId").innerText = order.id;
+    document.getElementById("resStatus").innerText = order.status;
+    document.getElementById("resName").innerText = order.name;
+    document.getElementById("resEmail").innerText = order.email || "غير متوفر";
+    document.getElementById("resPhone").innerText = order.phone || "غير متوفر";
+    document.getElementById("resAddress").innerText = order.address || "غير متوفر";
+    document.getElementById("resItems").innerText = formatTrackOrderItems(order.items);
+    document.getElementById("resTotal").innerText = order.total || "0.00";
+    document.getElementById("resDate").innerText = formatOrderDate(
+      order.created_at || order.date || "",
+    );
+    const currentStep = getOrderStep(order.status);
+    document.getElementById("trackingSteps").innerHTML = renderOrderSteps(currentStep);
+    document.getElementById("resMessage").innerText =
+      order.status === "تم التوصيل"
+        ? "تم تسليم طلبك بنجاح. نتمنى لك استخداماً سعيداً!"
+        : "طلبك تحت المتابعة الآن، وسيتم التواصل معك قريباً عبر رقم الجوال إذا احتجنا أي معلومات إضافية.";
+  } else {
+    document.getElementById("orderResult").style.display = "none";
+    document.getElementById("trackError").style.display = "block";
+  }
+}
 
-      const renderTrackNavActions = () => {
-        const navActions = document.getElementById("trackNavActions");
-        if (!navActions) return;
-        const user = getLoggedInUser();
-        if (user) {
-          navActions.innerHTML = `
-                    <a href="account.html" class="nav-icon" title="حسابي"><i data-lucide="user"></i></a>
-                    <button class="nav-icon" title="تسجيل خروج" onclick="logout(); window.location.href='index.html';" style="background:none; border:none; padding: 0; cursor:pointer; color: var(--text-muted);">
-                        <i data-lucide="log-out"></i>
-                    </button>
-                `;
-        } else {
-          navActions.innerHTML = `
-                    <a href="login.html" class="nav-icon" title="تسجيل دخول"><i data-lucide="log-in"></i></a>
-                    <a href="signup.html" class="nav-icon" title="إنشاء حساب"><i data-lucide="user-plus"></i></a>
-                `;
-        }
-        if (typeof lucide !== "undefined") lucide.createIcons();
-      };
+const renderTrackNavActions = () => {
+  const navActions = document.getElementById("trackNavActions");
+  if (!navActions) return;
+  const user = getLoggedInUser();
+  if (user) {
+    navActions.innerHTML = `
+      <a href="account.html" class="nav-icon" title="حسابي"><i data-lucide="user"></i></a>
+      <button class="nav-icon" title="تسجيل خروج" onclick="logout(); window.location.href='index.html';" style="background:none; border:none; padding: 0; cursor:pointer; color: var(--text-muted);">
+          <i data-lucide="log-out"></i>
+      </button>
+    `;
+  } else {
+    navActions.innerHTML = `
+      <a href="login.html" class="nav-icon" title="تسجيل دخول"><i data-lucide="log-in"></i></a>
+      <a href="signup.html" class="nav-icon" title="إنشاء حساب"><i data-lucide="user-plus"></i></a>
+    `;
+  }
+  if (typeof lucide !== "undefined") lucide.createIcons();
+};
 
-      const renderCustomerOrders = () => {
-        const container = document.getElementById("ordersContainer");
-        const user = getLoggedInUser();
-        const orders = getOrdersStorage();
+const renderCustomerOrders = async () => {
+  const container = document.getElementById("ordersContainer");
+  const user = getLoggedInUser();
+  const orders = await fetchOrders();
 
-        if (!container) return;
-        if (!user) {
-          container.innerHTML = `
-            <div class="glass" style="padding: 40px; border-radius: var(--radius-lg); background: rgba(255,255,255,0.05);">
-              <h2>مرحباً بك!</h2>
-              <p style="color: var(--text-muted); margin: 16px 0 0">
-                سجل دخولك لعرض طلباتك السابقة والكتابة دون الحاجة لاستخدام رقم الطلب.
-              </p>
-              <div style="margin-top: 24px; display:flex; justify-content:center; gap: 12px; flex-wrap: wrap;">
-                <a href="login.html" class="hero-btn" style="min-width: 140px">تسجيل دخول</a>
-                <a href="signup.html" class="hero-btn" style="min-width: 140px">إنشاء حساب</a>
-              </div>
+  if (!container) return;
+  if (!user) {
+    container.innerHTML = `
+      <div class="glass" style="padding: 40px; border-radius: var(--radius-lg); background: rgba(255,255,255,0.05);">
+        <h2>مرحباً بك!</h2>
+        <p style="color: var(--text-muted); margin: 16px 0 0">
+          سجل دخولك لعرض طلباتك السابقة والكتابة دون الحاجة لاستخدام رقم الطلب.
+        </p>
+        <div style="margin-top: 24px; display:flex; justify-content:center; gap: 12px; flex-wrap: wrap;">
+          <a href="login.html" class="hero-btn" style="min-width: 140px">تسجيل دخول</a>
+          <a href="signup.html" class="hero-btn" style="min-width: 140px">إنشاء حساب</a>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  const userEmail = (user.email || "").toLowerCase().trim();
+  const userName = (user.username || "").toLowerCase().trim();
+
+  const userOrders = orders.filter((order) => {
+    const orderEmail = (order.email || "").toLowerCase().trim();
+    const orderName = (order.name || "").toLowerCase().trim();
+    const emailMatch = userEmail && orderEmail === userEmail;
+    const nameMatch = userName && orderName === userName;
+    return emailMatch || nameMatch;
+  });
+
+  if (userOrders.length === 0) {
+    if (orders.length > 0) {
+      container.innerHTML = `
+        <div class="glass" style="padding: 40px; border-radius: var(--radius-lg); background: rgba(255,255,255,0.05); margin-bottom: 20px;">
+          <h2>لا توجد طلبات لهذا الحساب</h2>
+          <p style="color: var(--text-muted); margin: 16px 0 0">
+            يوجد ${orders.length} طلباً مخزناً حالياً في الخادم، لكن حسابك الحالي (${user.username || "غير معروف"}) لا يتطابق مع أي منها.
+          </p>
+          <p style="color: var(--text-muted); margin: 16px 0 0; font-size: 0.85rem; direction: ltr;">
+            ملف التعريف: username="${user.username || "?"}" | email="${user.email || "?"}"
+          </p>
+          <p style="color: var(--text-muted); margin: 16px 0 0">
+            إذا أكملت الشراء وتريد رؤية الطلب هنا، سجّل الدخول بنفس الحساب الذي استخدمته عند الشراء.
+          </p>
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = `
+      <div class="glass" style="padding: 40px; border-radius: var(--radius-lg); background: rgba(255,255,255,0.05);">
+        <h2>لم يتم حفظ أي طلب</h2>
+        <p style="color: var(--text-muted); margin: 16px 0 0">
+          لم يتم العثور على أي طلبات على الخادم حالياً.
+        </p>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = userOrders
+    .slice()
+    .reverse()
+    .map(
+      (order) => `
+        <div class="glass" style="padding: 28px; border-radius: var(--radius-lg); margin-bottom: 22px; text-align: right;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap;">
+            <div>
+              <p style="margin: 0; color: var(--text-muted);">رقم الطلب</p>
+              <h2 style="margin: 8px 0 0; direction: ltr; letter-spacing: 0.12em;">${order.id}</h2>
             </div>
-          `;
-          return;
-        }
+            <span style="background: rgba(56,189,248,0.12); color: var(--secondary); padding: 10px 16px; border-radius: 999px; font-weight: 700; white-space: nowrap;">${order.status}</span>
+          </div>
+          <div style="display: grid; gap: 14px; margin-top: 24px;">
+            <p style="margin: 0;"><strong>التاريخ:</strong> ${formatOrderDate(order.created_at || order.date || "")}</p>
+            <p style="margin: 0;"><strong>المنتجات:</strong> ${formatTrackOrderItems(order.items)}</p>
+            <p style="margin: 0;"><strong>العنوان:</strong> ${order.address || "غير متوفر"}</p>
+            <p style="margin: 0;"><strong>رقم الجوال:</strong> ${order.phone || "غير متوفر"}</p>
+            <p style="margin: 0;"><strong>المجموع:</strong> ${order.total}$</p>
+          </div>
+          <div style="margin-top: 22px; display: grid; gap: 10px;">
+            ${renderOrderSteps(getOrderStep(order.status))}
+          </div>
+        </div>
+      `,
+    )
+    .join("");
+};
 
-        const userEmail = (user.email || "").toLowerCase().trim();
-        const userName = (user.username || "").toLowerCase().trim();
+document.addEventListener("DOMContentLoaded", () => {
+  renderTrackNavActions();
+  renderCustomerOrders();
+});
 
-        const userOrders = orders.filter((order) => {
-          const orderEmail = (order.email || "").toLowerCase().trim();
-          const orderName = (order.name || "").toLowerCase().trim();
-          const emailMatch = userEmail && orderEmail === userEmail;
-          const nameMatch = userName && orderName === userName;
-          return emailMatch || nameMatch;
-        });
+// Bind to window for inline events
+window.trackOrder = trackOrder;
 
-        if (userOrders.length === 0) {
-          if (orders.length > 0) {
-            container.innerHTML = `
-              <div class="glass" style="padding: 40px; border-radius: var(--radius-lg); background: rgba(255,255,255,0.05); margin-bottom: 20px;">
-                <h2>لا توجد طلبات لهذا الحساب</h2>
-                <p style="color: var(--text-muted); margin: 16px 0 0">
-                  يوجد ${orders.length} طلباً مخزناً حالياً في المتصفح، لكن حسابك الحالي (${user.username || "غير معروف"}) لا يتطابق مع أي منها.
-                </p>
-                <p style="color: var(--text-muted); margin: 16px 0 0; font-size: 0.85rem; direction: ltr;">
-                  ملف التعريف: username="${user.username || "?"}" | email="${user.email || "?"}"
-                </p>
-                <p style="color: var(--text-muted); margin: 16px 0 0">
-                  إذا أكملت الشراء وتريد رؤية الطلب هنا، سجّل الدخول بنفس الحساب الذي استخدمته عند الشراء.
-                </p>
-              </div>
-            `;
-            const allOrdersHtml = orders
-              .slice()
-              .reverse()
-              .map(
-                (order) => `
-                  <div class="glass" style="padding: 28px; border-radius: var(--radius-lg); margin-bottom: 22px; text-align: right;">
-                    <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap;">
-                      <div>
-                        <p style="margin: 0; color: var(--text-muted);">رقم الطلب</p>
-                        <h2 style="margin: 8px 0 0; direction: ltr; letter-spacing: 0.12em;">${order.id}</h2>
-                      </div>
-                      <span style="background: rgba(56,189,248,0.12); color: var(--secondary); padding: 10px 16px; border-radius: 999px; font-weight: 700; white-space: nowrap;">${order.status}</span>
-                    </div>
-                    <div style="display: grid; gap: 14px; margin-top: 24px;">
-                      <p style="margin: 0;"><strong>التاريخ:</strong> ${formatOrderDate(order.created_at || order.date || "")}</p>
-                      <p style="margin: 0;"><strong>المنتجات:</strong> ${formatTrackOrderItems(order.items)}</p>
-                      <p style="margin: 0;"><strong>العنوان:</strong> ${order.address || "غير متوفر"}</p>
-                      <p style="margin: 0;"><strong>رقم الجوال:</strong> ${order.phone || "غير متوفر"}</p>
-                      <p style="margin: 0;"><strong>المجموع:</strong> ${order.total}$</p>
-                    </div>
-                  </div>
-                `,
-              )
-              .join("");
-            container.innerHTML += allOrdersHtml;
-            return;
-          }
-
-          container.innerHTML = `
-            <div class="glass" style="padding: 40px; border-radius: var(--radius-lg); background: rgba(255,255,255,0.05);">
-              <h2>لم يتم حفظ أي طلب</h2>
-              <p style="color: var(--text-muted); margin: 16px 0 0">
-                لم يصل أي طلب من الشراء الحالي إلى التخزين المحلي. تأكد من الضغط على "إتمام الشراء" حتى تظهر رسالة تأكيد الطلب.
-              </p>
-            </div>
-          `;
-          return;
-        }
-
-        container.innerHTML = userOrders
-          .slice()
-          .reverse()
-          .map(
-            (order) => `
-              <div class="glass" style="padding: 28px; border-radius: var(--radius-lg); margin-bottom: 22px; text-align: right;">
-                <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap;">
-                  <div>
-                    <p style="margin: 0; color: var(--text-muted);">رقم الطلب</p>
-                    <h2 style="margin: 8px 0 0; direction: ltr; letter-spacing: 0.12em;">${order.id}</h2>
-                  </div>
-                  <span style="background: rgba(56,189,248,0.12); color: var(--secondary); padding: 10px 16px; border-radius: 999px; font-weight: 700; white-space: nowrap;">${order.status}</span>
-                </div>
-                <div style="display: grid; gap: 14px; margin-top: 24px;">
-                  <p style="margin: 0;"><strong>التاريخ:</strong> ${formatOrderDate(order.created_at || order.date || "")}</p>
-                  <p style="margin: 0;"><strong>المنتجات:</strong> ${formatTrackOrderItems(order.items)}</p>
-                  <p style="margin: 0;"><strong>العنوان:</strong> ${order.address || "غير متوفر"}</p>
-                  <p style="margin: 0;"><strong>رقم الجوال:</strong> ${order.phone || "غير متوفر"}</p>
-                  <p style="margin: 0;"><strong>المجموع:</strong> ${order.total}$</p>
-                </div>
-                <div style="margin-top: 22px; display: grid; gap: 10px;">
-                  ${renderOrderSteps(getOrderStep(order.status))}
-                </div>
-              </div>
-            `,
-          )
-          .join("");
-      };
-
-      const renderTrackNavActions = () => {
-        const navActions = document.getElementById("trackNavActions");
-        if (!navActions) return;
-        const user = getLoggedInUser();
-        if (user) {
-          navActions.innerHTML = `
-                    <a href="account.html" class="nav-icon" title="حسابي"><i data-lucide="user"></i></a>
-                    <button class="nav-icon" title="تسجيل خروج" onclick="logout(); window.location.href='index.html';" style="background:none; border:none; padding: 0; cursor:pointer; color: var(--text-muted);">
-                        <i data-lucide="log-out"></i>
-                    </button>
-                `;
-        } else {
-          navActions.innerHTML = `
-                    <a href="login.html" class="nav-icon" title="تسجيل دخول"><i data-lucide="log-in"></i></a>
-                    <a href="signup.html" class="nav-icon" title="إنشاء حساب"><i data-lucide="user-plus"></i></a>
-                `;
-        }
-        if (typeof lucide !== "undefined") lucide.createIcons();
-      };
-
-      document.addEventListener("DOMContentLoaded", () => {
-        renderTrackNavActions();
-        renderCustomerOrders();
-      });
     </script>
   </body>
 </html>
