@@ -173,6 +173,18 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
+      // Strong password validation: 8+ chars, 1 uppercase, 1 lowercase, 1 digit
+      const passwordPattern = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+      if (!passwordPattern.test(password)) {
+        if (message) {
+          message.innerText = "يجب أن تكون كلمة المرور 8 خانات على الأقل، وتحتوي على حرف كبير (A-Z)، وحرف صغير (a-z)، ورقم (0-9).";
+          message.style.color = "#ef4444";
+          message.style.display = "block";
+        }
+        resetLoadingButton(submitButton);
+        return;
+      }
+
       try {
         const response = await fetch("/api/users/signup", {
           method: "POST",
@@ -193,11 +205,11 @@ document.addEventListener("DOMContentLoaded", () => {
           }
           setTimeout(() => {
             resetLoadingButton(submitButton);
-            window.location.href = "account.html";
+            window.location.href = "index.html";
           }, 900);
         } else {
           if (message) {
-            message.innerText = result.error || "اسم المستخدم أو البريد الإلكتروني مستخدم سابقاً، اختر بيانات أخرى.";
+            message.innerText = result.error || "البريد الإلكتروني مستخدم سابقاً، اختر بريداً آخر.";
             message.style.color = "#ef4444";
             message.style.display = "block";
           }

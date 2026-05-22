@@ -340,6 +340,7 @@ const renderProductsList = (list) => {
       return `
         <div class="product-card glass" onmousemove="handleCardGlow(event)">
             ${isPromo ? `<span class="promo-badge">خصم ${product.discount}%</span>` : ""}
+            ${product.match_id ? `<button class="match-badge-btn" onclick="showMatchingSet(${pId}, event)" style="position: absolute; top: 15px; left: 15px; background: linear-gradient(135deg, rgba(251,191,36,0.9), rgba(217,119,6,0.9)); color: #fff; border: none; border-radius: 20px; padding: 6px 12px; font-size: 0.72rem; font-weight: 700; cursor: pointer; z-index: 10; display: flex; align-items: center; box-shadow: 0 4px 12px rgba(217,119,6,0.3); transition: all 0.3s ease;" title="عرض القطعة المطابقة للأب/الابن"><i data-lucide="link" style="width: 13px; height: 13px; margin-inline-end: 4px;"></i> طقم متطابق 👨‍👦</button>` : ""}
             <div class="product-img-wrapper">
                 <img src="${product.image || fallbackImage}" class="product-img" alt="${product.title}" onerror="this.src='${fallbackImage}'">
             </div>
@@ -367,6 +368,7 @@ const renderProductsList = (list) => {
       `;
     })
     .join("");
+  if (typeof lucide !== "undefined") lucide.createIcons();
 };
 
 const filterByCategory = async (catId) => {

@@ -100,6 +100,16 @@ async function initializePostgresSchema() {
       items TEXT NOT NULL
     )`);
 
+    // Alter schema dynamically for new columns & non-unique username constraints
+    try {
+      await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'لم يتم الدفع'`);
+      await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'كاش عند الاستلام'`);
+      await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_cost DOUBLE PRECISION DEFAULT 0`);
+      await pool.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_username_key`);
+    } catch (alterErr) {
+      console.warn("Schema alters warning:", alterErr.message);
+    }
+
     // Seed default categories
     const catCheck = await pool.query("SELECT COUNT(*) as count FROM categories");
     if (parseInt(catCheck.rows[0].count, 10) === 0) {
@@ -345,19 +355,20 @@ const DB = {
       let query = "SELECT * FROM orders";
       let params = [];
       if (username) {
-        query += " WHERE name = $1";
-        params.push(username);
+        query += " WHERE name = $1 OR email = $2";
+        params.push(username, username);
       }
       const res = await pool.query(query, params);
       return res.rows.map((row) => ({
         ...row,
         items: JSON.parse(row.items || "[]"),
         total: parseFloat(row.total),
+        shipping_cost: parseFloat(row.shipping_cost || 0),
       }));
     }
     const orders = await readJSONFile(ORDERS_FILE, []);
     if (username) {
-      return orders.filter(o => o.name === username);
+      return orders.filter(o => o.name === username || o.email === username);
     }
     return orders;
   },
@@ -366,8 +377,8 @@ const DB = {
     const itemsStr = JSON.stringify(order.items || []);
     if (usePostgres) {
       const res = await pool.query(
-        `INSERT INTO orders (id, name, email, phone, address, items, status, total, created_at) 
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+        `INSERT INTO orders (id, name, email, phone, address, items, status, total, created_at, payment_status, payment_method, shipping_cost) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
         [
           order.id,
           order.name,
@@ -378,10 +389,18 @@ const DB = {
           order.status,
           order.total,
           order.created_at,
+          order.payment_status || "لم يتم الدفع",
+          order.payment_method || "كاش عند الاستلام",
+          parseFloat(order.shipping_cost || 0),
         ]
       );
       const o = res.rows[0];
-      return o ? { ...o, items: JSON.parse(o.items || "[]"), total: parseFloat(o.total) } : null;
+      return o ? { 
+        ...o, 
+        items: JSON.parse(o.items || "[]"), 
+        total: parseFloat(o.total),
+        shipping_cost: parseFloat(o.shipping_cost || 0)
+      } : null;
     }
     const orders = await this.getOrders();
     orders.push(order);
@@ -571,6 +590,22 @@ const server = http.createServer(async (req, res) => {
           const success = await DB.updateOrderStatus(body.id, body.status);
           res.writeHead(success ? 200 : 404);
           res.end(JSON.stringify({ success }));
+        } else if (body.action === "updatePaymentStatus") {
+          let success = false;
+          if (usePostgres) {
+            const resDb = await pool.query("UPDATE orders SET payment_status = $1 WHERE id = $2", [body.payment_status, body.id]);
+            success = resDb.rowCount > 0;
+          } else {
+            const orders = await DB.getOrders();
+            const index = orders.findIndex((o) => o.id === body.id);
+            if (index !== -1) {
+              orders[index].payment_status = body.payment_status;
+              await writeJSONFile(ORDERS_FILE, orders);
+              success = true;
+            }
+          }
+          res.writeHead(success ? 200 : 404);
+          res.end(JSON.stringify({ success }));
         } else {
           const orderId = body.id || `TRK-${Math.floor(1000 + Math.random() * 9000)}`;
           const newOrder = {
@@ -606,10 +641,10 @@ const server = http.createServer(async (req, res) => {
         try {
           const body = await getRequestBody(req);
           const users = await DB.getUsers();
-          const exists = users.some((u) => u.username === body.username || u.email === body.email);
+          const exists = users.some((u) => u.email === body.email);
           if (exists) {
             res.writeHead(400);
-            res.end(JSON.stringify({ error: "اسم المستخدم أو البريد الإلكتروني مسجل بالفعل!" }));
+            res.end(JSON.stringify({ error: "البريد الإلكتروني مسجل بالفعل!" }));
           } else {
             const newUser = await DB.createUser({
               username: body.username,
@@ -624,7 +659,7 @@ const server = http.createServer(async (req, res) => {
           console.error("Signup error:", err);
           if (err.code === '23505') { // Postgres unique constraint violation
             res.writeHead(400);
-            res.end(JSON.stringify({ error: "اسم المستخدم أو البريد الإلكتروني مسجل بالفعل!" }));
+            res.end(JSON.stringify({ error: "البريد الإلكتروني مسجل بالفعل!" }));
           } else {
             res.writeHead(500);
             res.end(JSON.stringify({ error: "حدث خطأ في الخادم" }));
@@ -637,7 +672,7 @@ const server = http.createServer(async (req, res) => {
       if (requestUrl === "/api/users/login" && req.method === "POST") {
         const body = await getRequestBody(req);
         const users = await DB.getUsers();
-        const user = users.find((u) => u.username === body.username && u.password === body.password);
+        const user = users.find((u) => (u.username === body.username || u.email === body.username) && u.password === body.password);
         if (user) {
           res.writeHead(200);
           res.end(JSON.stringify({ 
@@ -646,7 +681,7 @@ const server = http.createServer(async (req, res) => {
           }));
         } else {
           res.writeHead(401);
-          res.end(JSON.stringify({ error: "اسم المستخدم أو كلمة المرور غير صحيحة!" }));
+          res.end(JSON.stringify({ error: "اسم المستخدم أو البريد الإلكتروني أو كلمة المرور غير صحيحة!" }));
         }
         return;
       }

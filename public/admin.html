@@ -43,7 +43,7 @@
       </div>
     </nav>
 
-    <main class="container">
+    <main class="container" style="padding-top: 120px;">
       <!-- Login Form -->
       <div id="loginView" class="admin-login-wrapper">
         <div class="admin-card glass">
@@ -306,13 +306,12 @@
                 placeholder="معرف المطابقة (match_id)"
               />
             </div>
-            <div class="field-group">
-              <label for="pSizes">الأحجام</label>
-              <input
-                id="pSizes"
-                class="input-field"
-                placeholder="الأحجام (مثال: S,M,L)"
-              />
+            <div class="field-group" style="grid-column: 1 / -1;">
+              <label>الأحجام المتوفرة (اختر من متعدد) <span style="color:var(--secondary); font-weight: 700;">*</span></label>
+              <div id="sizesCheckboxesContainer" style="display: flex; gap: 12px; flex-wrap: wrap; margin-top: 8px; background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.06);">
+                <!-- Checkboxes will be injected dynamically -->
+              </div>
+              <input type="hidden" id="pSizes" />
             </div>
             <div class="field-group">
               <label for="pQuantity">الكمية المتاحة</label>
@@ -382,6 +381,19 @@
           </table>
         </div>
       </div>
+
+      <!-- Order Details Modal -->
+      <div id="adminOrderDetailsModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(8px); z-index: 9999; justify-content: center; align-items: center; padding: 20px;">
+        <div class="glass" style="max-width: 750px; width: 100%; max-height: 90vh; overflow-y: auto; padding: 30px; border-radius: var(--radius-lg); position: relative; color: var(--text-main); text-align: right; box-shadow: 0 20px 40px rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1);">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 15px; margin-bottom: 20px;">
+            <h2 style="margin: 0; font-size: 1.4rem; font-weight: 800;">📦 تفاصيل الطلب الكاملة</h2>
+            <button onclick="closeOrderDetailsModal()" style="background: none; border: none; color: var(--text-main); font-size: 2rem; cursor: pointer; line-height: 1; transition: transform 0.2s;" onmouseover="this.style.transform='scale(1.2)'" onmouseout="this.style.transform='scale(1)'">&times;</button>
+          </div>
+          <div id="adminOrderDetailsBody">
+            <!-- Loaded dynamically via JS -->
+          </div>
+        </div>
+      </div>
     </main>
 
     <script src="script.js?v=5"></script>
@@ -390,6 +402,201 @@
 
 let adminNavButton;
 let adminOrderFilter = "all";
+
+// --- CHECKBOX SIZES DYNAMIC SYSTEM ---
+const ADULT_SIZES = ["S", "M", "L", "XL", "XXL"];
+const CHILD_SIZES = ["2-3Y", "4-5Y", "6-7Y", "8-9Y", "10-11Y", "12-13Y"];
+
+const updateSizesSelector = (selectedArray = []) => {
+  const pType = document.getElementById("pType")?.value || "father";
+  const container = document.getElementById("sizesCheckboxesContainer");
+  if (!container) return;
+
+  const sizes = pType === "father" ? ADULT_SIZES : CHILD_SIZES;
+  container.innerHTML = sizes.map(sz => {
+    // Normalize comparison
+    const isChecked = selectedArray.some(s => s.trim().toUpperCase() === sz.toUpperCase());
+    return `
+      <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; background: rgba(255,255,255,0.05); padding: 8px 14px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); font-size: 0.85rem; transition: background 0.2s;" onmouseover="this.style.background='rgba(255,255,255,0.1)'" onmouseout="this.style.background='rgba(255,255,255,0.05)'">
+        <input type="checkbox" name="sizeCheckbox" value="${sz}" ${isChecked ? "checked" : ""} onchange="gatherSizesChecked()" style="cursor: pointer; accent-color: var(--secondary);">
+        <span>${sz}</span>
+      </label>
+    `;
+  }).join("");
+  gatherSizesChecked();
+};
+
+const gatherSizesChecked = () => {
+  const checkboxes = document.querySelectorAll('input[name="sizeCheckbox"]:checked');
+  const values = Array.from(checkboxes).map(cb => cb.value);
+  const hiddenInput = document.getElementById("pSizes");
+  if (hiddenInput) {
+    hiddenInput.value = values.join(",");
+  }
+};
+
+// --- PREMIUM ORDER DETAILS MODAL ---
+const openOrderDetailsModal = async (orderId) => {
+  const modal = document.getElementById("adminOrderDetailsModal");
+  const body = document.getElementById("adminOrderDetailsBody");
+  if (!modal || !body) return;
+
+  try {
+    const res = await fetch("/api/orders");
+    const orders = await res.json();
+    const order = orders.find((o) => o.id === orderId);
+    if (!order) return;
+
+    let parsedAddress;
+    try {
+      parsedAddress = JSON.parse(order.address);
+    } catch {
+      parsedAddress = { recipient: order.name, city: order.address, area: "", street: "", coordinates: "", notes: "" };
+    }
+
+    const isPaid = order.payment_status === "Paid";
+    const paymentMethodText = order.payment_method === "cash" ? "كاش (عند التوصيل) 💵" : order.payment_method === "visa" ? "فيزا 💳" : "بايبال 🅿️";
+
+    const itemsHTML = (order.items || []).map(item => {
+      const originalPrice = parseFloat(item.price || 0);
+      const discount = parseInt(item.discount || 0, 10);
+      const finalPrice = discount > 0 ? originalPrice * (1 - discount/100) : originalPrice;
+
+      return `
+        <div style="display: flex; gap: 15px; align-items: center; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); padding: 12px; border-radius: 12px; margin-bottom: 12px;">
+          <img src="${item.image || fallbackImage}" width="65" height="65" style="object-fit: cover; border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);" onerror="this.src='${fallbackImage}'">
+          <div style="flex: 1; text-align: right;">
+            <h4 style="font-size: 0.95rem; margin: 0 0 6px 0; color: var(--text-main); font-weight: 700;">${item.title}</h4>
+            <div style="display: flex; gap: 15px; flex-wrap: wrap; font-size: 0.82rem; color: var(--text-muted);">
+              ${item.size ? `<span><strong>المقاس:</strong> ${item.size}</span>` : ""}
+              <span><strong>الكمية:</strong> ${item.quantity || 1}</span>
+              <span><strong>سعر القطعة:</strong> ${discount > 0 ? `<span style="text-decoration:line-through; margin-inline-end:5px;">${originalPrice.toFixed(2)}$</span>` : ""}${finalPrice.toFixed(2)}$</span>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    body.innerHTML = `
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; margin-bottom: 24px;">
+        <!-- Left Side: Order Info & Products -->
+        <div>
+          <h3 style="border-bottom: 2px solid var(--secondary); padding-bottom: 6px; margin-top: 0; font-size: 1.15rem; font-weight:700;">👕 المنتجات المطلوبة</h3>
+          <div style="max-height: 250px; overflow-y: auto; padding-inline-end: 5px; margin-top: 15px;">
+            ${itemsHTML}
+          </div>
+
+          <div style="margin-top: 20px; background: rgba(255,255,255,0.02); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+              <span style="color: var(--text-muted); font-size: 0.9rem;">سعر المنتجات:</span>
+              <span style="font-weight: 600;">${(order.total - (order.shipping_cost || 0)).toFixed(2)}$</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+              <span style="color: var(--text-muted); font-size: 0.9rem;">تكلفة الشحن:</span>
+              <span style="font-weight: 600;">${(order.shipping_cost || 0).toFixed(2)}$</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px; font-weight: 800; font-size: 1.15rem; color: var(--secondary);">
+              <span>المجموع الإجمالي:</span>
+              <span>${Number(order.total).toFixed(2)}$</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Side: Delivery & Payment Details -->
+        <div>
+          <h3 style="border-bottom: 2px solid var(--secondary); padding-bottom: 6px; margin-top: 0; font-size: 1.15rem; font-weight:700;">📍 معلومات التوصيل</h3>
+          <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 8px; font-size: 0.9rem;">
+            <p><strong>الاسم المستلم:</strong> ${parsedAddress.recipient || order.name || "غير متوفر"}</p>
+            <p><strong>المدينة (المحافظة):</strong> ${parsedAddress.city || "غير متوفر"}</p>
+            <p><strong>المنطقة / الحي:</strong> ${parsedAddress.area || "غير متوفر"}</p>
+            <p><strong>الشارع / تفاصيل إضافية:</strong> ${parsedAddress.street || "غير متوفر"}</p>
+            <p><strong>رقم الهاتف:</strong> <a href="tel:${order.phone}" style="color: var(--secondary); text-decoration: underline;">${order.phone || "غير متوفر"}</a></p>
+            <p><strong>ملاحظات العميل:</strong> <span style="color: var(--text-muted); font-style: italic;">${parsedAddress.notes || "لا توجد ملاحظات"}</span></p>
+            <div style="margin-top: 10px;">
+              <strong>موقع الخريطة:</strong>
+              ${parsedAddress.coordinates 
+                ? `<a href="https://www.google.com/maps/search/?api=1&query=${parsedAddress.coordinates}" target="_blank" style="display: inline-flex; align-items: center; gap: 5px; background: rgba(16,185,129,0.15); color: #10b981; border: 1px solid rgba(16,185,129,0.3); padding: 6px 12px; border-radius: 6px; text-decoration: none; font-size: 0.8rem; margin-inline-start: 10px; font-weight:700;">🗺️ عرض موقع التوصيل على الخريطة</a>` 
+                : '<span style="color: var(--text-muted); margin-inline-start: 10px;">لم يتم تحديد إحداثيات الموقع</span>'}
+            </div>
+          </div>
+
+          <h3 style="border-bottom: 2px solid var(--secondary); padding-bottom: 6px; margin-top: 25px; font-size: 1.15rem; font-weight:700;">💳 الدفع والحالة</h3>
+          <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 12px; font-size: 0.9rem;">
+            <p><strong>طريقة الدفع:</strong> ${paymentMethodText}</p>
+            
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <span><strong>حالة الدفع:</strong> 
+                <span id="paymentStatusBadge" style="padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; margin-inline-start: 8px; background: ${isPaid ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)"}; color: ${isPaid ? "#10b981" : "#ef4444"}; border: 1px solid ${isPaid ? "rgba(16,185,129,0.3)" : "rgba(239,68,68,0.3)"};">
+                  ${isPaid ? "مدفوع ✅" : "غير مدفوع ❌"}
+                </span>
+              </span>
+              <button onclick="togglePaymentStatusModal('${order.id}', '${order.payment_status}')" style="background: var(--secondary); color: white; border: none; padding: 5px 12px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; transition: opacity 0.2s;" onmouseover="this.style.opacity=0.9" onmouseout="this.style.opacity=1;">تغيير حالة الدفع</button>
+            </div>
+
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px;">
+              <span><strong>حالة الطلب:</strong></span>
+              <select id="modalOrderStatusSelect" onchange="updateOrderStatusModal('${order.id}')" class="input-field" style="width: auto; padding: 4px 10px; font-size: 0.85rem; margin-inline-start: 10px;">
+                <option value="تم استلام الطلب" ${order.status === "تم استلام الطلب" ? "selected" : ""}>تم استلام الطلب</option>
+                <option value="قيد التجهيز" ${order.status === "قيد التجهيز" ? "selected" : ""}>قيد التجهيز</option>
+                <option value="تم الشحن" ${order.status === "تم الشحن" ? "selected" : ""}>تم الشحن</option>
+                <option value="في الطريق إليك" ${order.status === "في الطريق إليك" ? "selected" : ""}>في الطريق إليك</option>
+                <option value="تم التوصيل" ${order.status === "تم التوصيل" ? "selected" : ""}>تم التوصيل</option>
+                <option value="ملغي" ${order.status === "ملغي" ? "selected" : ""}>ملغي ⚠️</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    modal.style.display = "flex";
+  } catch (err) {
+    console.error("Failed to open order details modal:", err);
+  }
+};
+
+const closeOrderDetailsModal = () => {
+  const modal = document.getElementById("adminOrderDetailsModal");
+  if (modal) modal.style.display = "none";
+};
+
+const togglePaymentStatusModal = async (orderId, currentStatus) => {
+  const nextStatus = currentStatus === "Paid" ? "Unpaid" : "Paid";
+  try {
+    const res = await fetch("/api/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "updatePaymentStatus", id: orderId, payment_status: nextStatus })
+    });
+    if (res.ok) {
+      showToast("تم تحديث حالة الدفع للطلب بنجاح!");
+      openOrderDetailsModal(orderId);
+      renderAdminOrders();
+    }
+  } catch (err) {
+    console.error("Failed to update payment status:", err);
+  }
+};
+
+const updateOrderStatusModal = async (orderId) => {
+  const select = document.getElementById("modalOrderStatusSelect");
+  if (!select) return;
+  const newStatus = select.value;
+
+  try {
+    const res = await fetch("/api/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "updateStatus", id: orderId, status: newStatus })
+    });
+    if (res.ok) {
+      showToast(`تم تغيير حالة الطلب بنجاح إلى: ${newStatus}`);
+      renderAdminOrders();
+    }
+  } catch (err) {
+    console.error("Failed to update order status:", err);
+  }
+};
 
 const orderStatusFlow = [
   "تم استلام الطلب",
@@ -572,6 +779,16 @@ const renderAdminProducts = async () => {
   if (!body && !statsContainer) return;
 
   const products = await fetchProducts();
+  let ordersCount = 0;
+  try {
+    const ordersRes = await fetch("/api/orders");
+    if (ordersRes.ok) {
+      const orders = await ordersRes.json();
+      ordersCount = orders.length;
+    }
+  } catch (ordersErr) {
+    console.error("Failed to load orders for stats:", ordersErr);
+  }
 
   if (body) {
     if (products.length === 0) {
@@ -610,8 +827,8 @@ const renderAdminProducts = async () => {
   if (statsContainer) {
     const fathers = products.filter((p) => p.type === "father").length;
     const children = products.filter((p) => p.type === "child").length;
-    const sizeCount = products.reduce(
-      (acc, p) => acc + (Array.isArray(p.sizes) ? p.sizes.length : 0),
+    const totalStock = products.reduce(
+      (acc, p) => acc + parseInt(p.quantity || 0, 10),
       0,
     );
     statsContainer.innerHTML = `
@@ -628,8 +845,12 @@ const renderAdminProducts = async () => {
                 <strong>${children}</strong>
             </div>
             <div class="admin-stat-card">
-                <span>عدد الأحجام</span>
-                <strong>${sizeCount}</strong>
+                <span>إجمالي المخزون</span>
+                <strong>${totalStock}</strong>
+            </div>
+            <div class="admin-stat-card">
+                <span>إجمالي الطلبات</span>
+                <strong>${ordersCount}</strong>
             </div>
         `;
   }
@@ -700,10 +921,10 @@ const renderAdminOrders = async () => {
   try {
     const res = await fetch("/api/orders");
     const orders = await res.json();
-    const pendingCount = orders.filter((o) => o.status !== "تم التوصيل").length;
+    const pendingCount = orders.filter((o) => o.status !== "تم التوصيل" && o.status !== "ملغي").length;
     const filteredOrders =
       adminOrderFilter === "pending"
-        ? orders.filter((o) => o.status !== "تم التوصيل")
+        ? orders.filter((o) => o.status !== "تم التوصيل" && o.status !== "ملغي")
         : orders;
 
     if (body) {
@@ -728,33 +949,41 @@ const renderAdminOrders = async () => {
           .slice()
           .reverse()
           .map(
-            (order) => `
+            (order) => {
+              const isCancelled = order.status === "ملغي";
+              const isDelivered = order.status === "تم التوصيل";
+              return `
               <tr>
                   <td>${order.id}</td>
                   <td>${order.name || "غير معروف"}</td>
                   <td>${order.phone || "غير متوفر"}</td>
-                  <td>${order.status}</td>
-                  <td>${order.total}$</td>
+                  <td>
+                    <span style="padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; background: ${isCancelled ? "rgba(239,68,68,0.15)" : isDelivered ? "rgba(16,185,129,0.15)" : "rgba(59,130,246,0.15)"}; color: ${isCancelled ? "#ef4444" : isDelivered ? "#10b981" : "#2563eb"}; border: 1px solid ${isCancelled ? "rgba(239,68,68,0.3)" : isDelivered ? "rgba(16,185,129,0.3)" : "rgba(59,130,246,0.3)"};">
+                      ${order.status}
+                    </span>
+                  </td>
+                  <td>${Number(order.total).toFixed(2)}$</td>
                   <td>${new Date(order.created_at || order.date || "").toLocaleDateString("ar-EG", {
                     day: "numeric",
                     month: "long",
                     year: "numeric",
                   })}</td>
-                  <td style="text-align: left; max-width: 420px; white-space: normal;">
-                    ${formatOrderItems(order.items)}
+                  <td>
+                    <button class="hero-btn" style="background: rgba(59,130,246,0.12); color: #2563eb; width: auto; padding: 6px 12px; font-size: 0.85rem;" onclick="openOrderDetailsModal('${order.id}')">👁️ عرض التفاصيل</button>
                   </td>
                   <td>
                     <button
                       class="hero-btn"
-                      style="background: rgba(59,130,246,0.12); color: #2563eb; width: auto;"
+                      style="background: rgba(59,130,246,0.12); color: #2563eb; width: auto; padding: 6px 12px; font-size: 0.85rem;"
                       onclick="advanceOrderStatus('${order.id}')"
-                      ${order.status === "تم التوصيل" ? "disabled" : ""}
+                      ${isDelivered || isCancelled ? "disabled" : ""}
                     >
-                      ${order.status === "تم التوصيل" ? "مكتمل" : "تحديث الحالة"}
+                      ${isDelivered ? "مكتمل" : isCancelled ? "ملغي" : "تحديث الحالة"}
                     </button>
                   </td>
               </tr>
-          `,
+          `;
+            }
           )
           .join("");
       }
@@ -789,6 +1018,8 @@ const populateProductForm = async (id) => {
   document.getElementById("pDesc").value = product.description || "";
   document.getElementById("pId").value = product.id;
 
+  updateSizesSelector(Array.isArray(product.sizes) ? product.sizes : []);
+
   document.getElementById("formTitle").innerText = "تعديل المنتج";
   document.getElementById("submitBtn").innerText = "حفظ التعديلات";
   const cancelBtn = document.getElementById("cancelBtn");
@@ -810,6 +1041,8 @@ const cancelEdit = () => {
   document.getElementById("pQuantity").value = "0";
   document.getElementById("pDiscount").value = "0";
   document.getElementById("pDesc").value = "";
+
+  updateSizesSelector([]);
 
   document.getElementById("formTitle").innerText = "إضافة منتج جديد";
   document.getElementById("submitBtn").innerText = "إضافة المنتج";
@@ -900,6 +1133,14 @@ document.addEventListener("DOMContentLoaded", () => {
   if (isAdmin) {
     showDashboard();
   }
+
+  // Initialize dynamic checklist sizes
+  updateSizesSelector([]);
+
+  // Listen to product type changes to switch checklist sizes
+  document.getElementById("pType")?.addEventListener("change", () => {
+    updateSizesSelector([]);
+  });
 });
 
 // Bind to window for inline events
@@ -915,6 +1156,10 @@ window.deleteProduct = deleteProduct;
 window.saveCategory = saveCategory;
 window.deleteCategory = deleteCategory;
 window.renderAdminCategories = renderAdminCategories;
+window.openOrderDetailsModal = openOrderDetailsModal;
+window.closeOrderDetailsModal = closeOrderDetailsModal;
+window.togglePaymentStatusModal = togglePaymentStatusModal;
+window.updateOrderStatusModal = updateOrderStatusModal;
 
     </script>
   </body>

@@ -37,24 +37,13 @@
             autocomplete="new-password"
           />
           <label class="auth-label">
-            البريد الإلكتروني
-            <input
-              type="email"
-              id="loginEmail"
-              name="email"
-              class="auth-input"
-              placeholder="البريد الإلكتروني"
-              autocomplete="email"
-            />
-          </label>
-          <label class="auth-label">
-            اسم المستخدم
+            اسم المستخدم أو البريد الإلكتروني
             <input
               type="text"
               id="loginUsername"
               name="username"
               class="auth-input"
-              placeholder="اسم المستخدم"
+              placeholder="أدخل اسم المستخدم أو البريد الإلكتروني"
               autocomplete="username"
               required
             />
@@ -113,13 +102,10 @@ const resetLoadingButton = (button) => {
 };
 
 document.addEventListener("DOMContentLoaded", () => {
-  const emailInput = document.getElementById("loginEmail");
   const usernameInput = document.getElementById("loginUsername");
   const passwordInput = document.getElementById("loginPassword");
-  if (emailInput) emailInput.value = "";
   if (usernameInput) usernameInput.value = "";
   if (passwordInput) passwordInput.value = "";
-  if (emailInput) emailInput.autocomplete = "email";
   if (usernameInput) usernameInput.autocomplete = "username";
   if (passwordInput) passwordInput.autocomplete = "new-password";
 
@@ -130,7 +116,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const submitButton = loginForm.querySelector('button[type="submit"]');
       setLoadingButton(submitButton, "جاري تسجيل الدخول...");
 
-      const email = document.getElementById("loginEmail")?.value.trim() || "";
       const username = document.getElementById("loginUsername")?.value.trim() || "";
       const password = document.getElementById("loginPassword")?.value.trim() || "";
       const message = document.getElementById("loginMessage");
@@ -146,7 +131,7 @@ document.addEventListener("DOMContentLoaded", () => {
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ username, email, password }),
+          body: JSON.stringify({ username, password }),
         });
 
         const result = await response.json();
@@ -163,11 +148,11 @@ document.addEventListener("DOMContentLoaded", () => {
           }
           setTimeout(() => {
             resetLoadingButton(submitButton);
-            window.location.href = "account.html";
+            window.location.href = "index.html";
           }, 900);
         } else {
           if (message) {
-            message.innerText = result.error || "اسم المستخدم أو كلمة المرور غير صحيحة.";
+            message.innerText = result.error || "اسم المستخدم أو البريد الإلكتروني أو كلمة المرور غير صحيحة.";
             message.style.color = "#ef4444";
             message.style.display = "block";
           }
