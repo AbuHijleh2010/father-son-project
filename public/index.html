@@ -118,39 +118,12 @@
         <!-- Cart items will be injected here -->
       </div>
       <div class="cart-footer" id="cartFooter" style="display: none">
-        <div style="margin-bottom: 18px; text-align: right">
-          <label for="checkoutAddress" style="display: block; margin-bottom: 8px; font-weight: 700">عنوان
-            التوصيل</label>
-          <textarea id="checkoutAddress" class="input-field" rows="3"
-            placeholder="اكتب العنوان الكامل ثم اضغط إتمام الشراء" style="width: 100%; resize: vertical"></textarea>
-          <p id="checkoutAddressError" style="
-                color: #ef4444;
-                margin-top: 6px;
-                display: none;
-                font-size: 0.95rem;
-              ">
-            الرجاء إدخال عنوان التوصيل.
-          </p>
-        </div>
-        <div style="margin-bottom: 18px; text-align: right">
-          <label for="checkoutPhone" style="display: block; margin-bottom: 8px; font-weight: 700">رقم الجوال</label>
-          <input id="checkoutPhone" class="input-field" type="tel" placeholder="مثال: 009627XXXXXXXX"
-            style="width: 100%" />
-          <p id="checkoutPhoneError" style="
-                color: #ef4444;
-                margin-top: 6px;
-                display: none;
-                font-size: 0.95rem;
-              ">
-            الرجاء إدخال رقم جوال صالح.
-          </p>
-        </div>
         <div class="total-section">
           <span>المجموع:</span>
           <span id="cartTotal">0$</span>
         </div>
-        <button class="checkout-btn" onclick="checkoutCart(event)">
-          إتمام الشراء الآن
+        <button class="checkout-btn" onclick="goToCartStep2(event)">
+          الانتقال للدفع 💳
         </button>
       </div>
     </div>

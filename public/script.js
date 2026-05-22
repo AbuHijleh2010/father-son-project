@@ -282,7 +282,6 @@ const renderCart = () => {
     )
     .join("");
 
-  if (footer) footer.style.display = "block";
   const total = cartItems.reduce(
     (acc, item) => {
       const isPromo = item.discount && item.discount > 0;
@@ -291,7 +290,19 @@ const renderCart = () => {
     },
     0,
   );
-  if (totalEl) totalEl.innerText = `${total.toFixed(2)}$`;
+
+  if (footer) {
+    footer.style.display = "block";
+    footer.innerHTML = `
+      <div class="total-section">
+        <span>المجموع:</span>
+        <span id="cartTotal">${total.toFixed(2)}$</span>
+      </div>
+      <button class="checkout-btn" onclick="goToCartStep2(event)">
+        الانتقال للدفع 💳
+      </button>
+    `;
+  }
   if (typeof lucide !== "undefined") lucide.createIcons();
 };
 
