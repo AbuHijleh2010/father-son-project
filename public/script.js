@@ -578,6 +578,9 @@ const renderCartStep2 = () => {
 
   container.innerHTML = `
     <div class="checkout-form-step" style="text-align: right; display: flex; flex-direction: column; gap: 15px;">
+      <!-- Validation Error Banner -->
+      <div id="checkoutFormError" style="display: none; background: rgba(239, 68, 68, 0.12); border: 1px solid #ef4444; color: #ef4444; padding: 12px; border-radius: 10px; font-weight: 700; font-size: 0.88rem; text-align: right; line-height: 1.5; box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15);"></div>
+
       <div>
         <label style="display: block; margin-bottom: 6px; font-weight: 700;">اسم المستلم بالكامل <span style="color:#ef4444">*</span></label>
         <input id="checkoutRecipientName" class="input-field" type="text" placeholder="الاسم الكامل للمستلم" style="width:100%; margin:0;" required>
@@ -609,28 +612,44 @@ const renderCartStep2 = () => {
       </div>
 
       <div>
-        <label style="display: block; margin-bottom: 6px; font-weight: 700;">موقع الخريطة <span style="color:var(--text-muted); font-weight:normal;">(اختياري)</span></label>
-        <div style="display: flex; gap: 10px; align-items: center;">
-          <button class="add-btn" type="button" onclick="openMapPicker()" style="margin:0; padding:10px; font-size:0.85rem; background:var(--bg-surface-light); border:1px solid var(--glass-border); flex:1;">📍 تحديد الموقع على الخريطة</button>
-          <input type="hidden" id="checkoutMapCoordinates">
-        </div>
-        <p id="mapSelectionStatus" style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;"></p>
-      </div>
-
-      <div>
-        <label style="display: block; margin-bottom: 6px; font-weight: 700;">ملاحظات إضافية</label>
+        <label style="display: block; margin-bottom: 6px; font-weight: 700;">ملاحظات إضافية للتوصيل</label>
         <textarea id="checkoutNotes" class="input-field" rows="2" placeholder="أي تفاصيل أخرى تسهل الوصول" style="width:100%; margin:0; resize:vertical;"></textarea>
       </div>
 
       <div>
         <label style="display: block; margin-bottom: 8px; font-weight: 700;">طريقة الدفع <span style="color:#ef4444">*</span></label>
-        <div style="display: flex; gap: 14px;">
-          <label style="display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="radio" name="paymentMethod" value="كاش عند الاستلام" checked> كاش</label>
-          <label style="display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="radio" name="paymentMethod" value="PayPal"> PayPal</label>
-          <label style="display:flex; align-items:center; gap:6px; cursor:pointer;"><input type="radio" name="paymentMethod" value="Visa"> Visa</label>
+        <div style="display: flex; gap: 18px; margin-bottom: 6px;">
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight: 700;"><input type="radio" name="paymentMethod" value="كاش عند الاستلام" checked onchange="togglePaymentInputs()"> كاش 💵</label>
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight: 700;"><input type="radio" name="paymentMethod" value="PayPal" onchange="togglePaymentInputs()"> PayPal 🅿️</label>
+          <label style="display:flex; align-items:center; gap:6px; cursor:pointer; font-weight: 700;"><input type="radio" name="paymentMethod" value="Visa" onchange="togglePaymentInputs()"> Visa 💳</label>
+        </div>
+
+        <!-- Visa payment details input form -->
+        <div id="visaPaymentDetails" style="display: none; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 15px; border-radius: 12px; margin-top: 10px; display: none; flex-direction: column; gap: 12px; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);">
+          <div>
+            <label style="display: block; margin-bottom: 4px; font-size: 0.82rem; font-weight: 700;">رقم البطاقة <span style="color:#ef4444">*</span></label>
+            <input id="visaCardNumber" class="input-field" type="text" maxlength="19" placeholder="XXXX XXXX XXXX XXXX" style="width:100%; margin:0; font-size:0.85rem;" oninput="formatCardNumber(this)">
+          </div>
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+            <div>
+              <label style="display: block; margin-bottom: 4px; font-size: 0.82rem; font-weight: 700;">تاريخ الانتهاء <span style="color:#ef4444">*</span></label>
+              <input id="visaExpiry" class="input-field" type="text" maxlength="5" placeholder="MM/YY" style="width:100%; margin:0; font-size:0.85rem;" oninput="formatExpiry(this)">
+            </div>
+            <div>
+              <label style="display: block; margin-bottom: 4px; font-size: 0.82rem; font-weight: 700;">رمز CVV <span style="color:#ef4444">*</span></label>
+              <input id="visaCvv" class="input-field" type="password" maxlength="3" placeholder="XXX" style="width:100%; margin:0; font-size:0.85rem;">
+            </div>
+          </div>
+        </div>
+
+        <!-- PayPal payment details input form -->
+        <div id="paypalPaymentDetails" style="display: none; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 15px; border-radius: 12px; margin-top: 10px; display: none; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);">
+          <label style="display: block; margin-bottom: 4px; font-size: 0.82rem; font-weight: 700;">البريد الإلكتروني لحساب PayPal <span style="color:#ef4444">*</span></label>
+          <input id="paypalEmail" class="input-field" type="email" placeholder="example@paypal.com" style="width:100%; margin:0; font-size:0.85rem;">
         </div>
       </div>
     </div>
+  `;
   `;
 
   if (footer) {
@@ -698,99 +717,6 @@ const updateShippingFee = () => {
   const grandTotalDisplay = document.getElementById("grandTotalDisplay");
   if (grandTotalDisplay) grandTotalDisplay.innerText = `${grandTotal.toFixed(2)}$`;
 };
-
-// Leaflet Map Integrations
-let mapInstance = null;
-let mapMarker = null;
-let selectedCoordinates = null;
-
-const ensureMapModalExists = () => {
-  if (document.getElementById("mapPickerModal")) return;
-  const modal = document.createElement("div");
-  modal.id = "mapPickerModal";
-  modal.className = "modal-overlay";
-  modal.style.display = "none";
-  modal.innerHTML = `
-    <div class="modal-card glass" style="max-width: 600px; height: 500px;">
-      <div class="modal-header">
-        <h3>📍 حدد موقع التوصيل على الخريطة</h3>
-        <button class="close-btn" onclick="closeMapPickerModal()">&times;</button>
-      </div>
-      <div class="modal-body" style="padding: 0; position: relative; height: 100%;">
-        <div id="mapPickerDiv" style="width: 100%; height: 100%;"></div>
-        <button class="hero-btn" onclick="confirmMapLocation()" style="position: absolute; bottom: 20px; left: 20px; z-index: 1000; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">تأكيد هذا الموقع</button>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(modal);
-};
-
-const loadLeafletMap = (callback) => {
-  if (window.L) {
-    callback();
-    return;
-  }
-  const link = document.createElement("link");
-  link.rel = "stylesheet";
-  link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-  document.head.appendChild(link);
-
-  const script = document.createElement("script");
-  script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-  script.onload = callback;
-  document.head.appendChild(script);
-};
-
-const openMapPicker = () => {
-  ensureMapModalExists();
-  document.getElementById("mapPickerModal").style.display = "flex";
-  
-  loadLeafletMap(() => {
-    setTimeout(() => {
-      if (!mapInstance) {
-        mapInstance = L.map("mapPickerDiv").setView([31.947, 35.227], 9); // Ramallah / Palestine Center
-        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-          attribution: "© OpenStreetMap contributors"
-        }).addTo(mapInstance);
-
-        mapInstance.on("click", (e) => {
-          const { lat, lng } = e.latlng;
-          selectedCoordinates = { lat, lng };
-          if (mapMarker) {
-            mapMarker.setLatLng([lat, lng]);
-          } else {
-            mapMarker = L.marker([lat, lng]).addTo(mapInstance);
-          }
-        });
-      } else {
-        mapInstance.invalidateSize();
-      }
-    }, 200);
-  });
-};
-
-const closeMapPickerModal = () => {
-  const modal = document.getElementById("mapPickerModal");
-  if (modal) modal.style.display = "none";
-};
-
-const confirmMapLocation = () => {
-  if (selectedCoordinates) {
-    const coordsStr = `${selectedCoordinates.lat.toFixed(5)}, ${selectedCoordinates.lng.toFixed(5)}`;
-    const mapInput = document.getElementById("checkoutMapCoordinates");
-    if (mapInput) {
-      mapInput.value = coordsStr;
-    }
-    const mapStatus = document.getElementById("mapSelectionStatus");
-    if (mapStatus) {
-      mapStatus.innerText = `📍 تم تحديد الموقع: (${coordsStr})`;
-      mapStatus.style.color = "var(--accent)";
-    }
-    showToast("تم حفظ موقع الخريطة بنجاح");
-  }
-  closeMapPickerModal();
-};
-
 // Matching Outfits Popup Modal
 const ensureMatchModalExists = () => {
   if (document.getElementById("matchOutfitModal")) return;
@@ -899,6 +825,37 @@ const addMatchingOutfitToCart = async (p1Id, p2Id) => {
   renderCart();
 };
 
+const togglePaymentInputs = () => {
+  const method = document.querySelector('input[name="paymentMethod"]:checked')?.value;
+  const visaDetails = document.getElementById("visaPaymentDetails");
+  const paypalDetails = document.getElementById("paypalPaymentDetails");
+  if (visaDetails) {
+    visaDetails.style.display = method === "Visa" ? "flex" : "none";
+  }
+  if (paypalDetails) {
+    paypalDetails.style.display = method === "PayPal" ? "block" : "none";
+  }
+};
+
+const formatCardNumber = (input) => {
+  let value = input.value.replace(/\D/g, "");
+  let formatted = "";
+  for (let i = 0; i < value.length; i++) {
+    if (i > 0 && i % 4 === 0) formatted += " ";
+    formatted += value[i];
+  }
+  input.value = formatted;
+};
+
+const formatExpiry = (input) => {
+  let value = input.value.replace(/\D/g, "");
+  if (value.length > 2) {
+    input.value = value.substring(0, 2) + "/" + value.substring(2, 4);
+  } else {
+    input.value = value;
+  }
+};
+
 const checkoutCart = async (event) => {
   const button = event?.currentTarget || event?.target;
   if (button) {
@@ -925,30 +882,154 @@ const checkoutCart = async (event) => {
   const street = document.getElementById("checkoutStreet")?.value.trim();
   const phone = document.getElementById("checkoutPhone")?.value.trim();
   const notes = document.getElementById("checkoutNotes")?.value.trim() || "";
-  const coordinates = document.getElementById("checkoutMapCoordinates")?.value || "";
   const paymentMethod = document.querySelector('input[name="paymentMethod"]:checked')?.value || "كاش عند الاستلام";
 
-  const phoneError = document.getElementById("checkoutPhoneError");
-  if (phoneError) phoneError.style.display = "none";
+  // Validation highlights resetting
+  const mainInputs = [
+    { id: "checkoutRecipientName", val: recipientName },
+    { id: "checkoutCity", val: city },
+    { id: "checkoutArea", val: area },
+    { id: "checkoutStreet", val: street },
+    { id: "checkoutPhone", val: phone }
+  ];
 
-  if (!recipientName || !city || !area || !street || !phone) {
-    showToast("الرجاء تعبئة كافة الحقول الإجبارية المعلمة بـ *");
-    if (button) {
-      button.disabled = false;
-      button.classList.remove("loading");
-      button.innerHTML = "تأكيد الطلب والدفع";
+  mainInputs.forEach(item => {
+    const el = document.getElementById(item.id);
+    if (el) {
+      el.style.border = "";
+      el.style.boxShadow = "";
     }
-    return;
+  });
+
+  const errorBanner = document.getElementById("checkoutFormError");
+  if (errorBanner) {
+    errorBanner.style.display = "none";
+    errorBanner.innerText = "";
   }
 
+  let hasErrors = false;
+  let errorMsgs = [];
+
+  // Check general fields
+  mainInputs.forEach(item => {
+    if (!item.val) {
+      const el = document.getElementById(item.id);
+      if (el) {
+        el.style.border = "1px solid #ef4444";
+        el.style.boxShadow = "0 0 8px rgba(239, 68, 68, 0.3)";
+      }
+      hasErrors = true;
+    }
+  });
+
+  if (hasErrors) {
+    errorMsgs.push("الرجاء تعبئة كافة الحقول الإجبارية المعلمة بـ *");
+  }
+
+  // Validate phone format
   const normalizedPhone = phone.replace(/\s+/g, "");
   const phoneValid = /^\+?\d{7,15}$/.test(normalizedPhone);
-  if (!phoneValid) {
-    if (phoneError) {
-      phoneError.innerText = "رقم الهاتف غير صالح. يجب أن يحتوي على أرقام فقط (7-15 خانة) ويمكن أن يبدأ بـ +.";
-      phoneError.style.display = "block";
+  if (phone && !phoneValid) {
+    const el = document.getElementById("checkoutPhone");
+    if (el) {
+      el.style.border = "1px solid #ef4444";
+      el.style.boxShadow = "0 0 8px rgba(239, 68, 68, 0.3)";
     }
-    showToast("الرجاء إدخال رقم هاتف جوال صالح");
+    hasErrors = true;
+    errorMsgs.push("رقم الهاتف الجوال غير صالح. يجب أن يحتوي على أرقام فقط (7-15 خانة).");
+  }
+
+  // Validate Payment Method inputs
+  let paymentDetailsJSON = {};
+  if (paymentMethod === "Visa") {
+    const cardNumber = document.getElementById("visaCardNumber")?.value.trim();
+    const expiry = document.getElementById("visaExpiry")?.value.trim();
+    const cvv = document.getElementById("visaCvv")?.value.trim();
+
+    const visaInputs = [
+      { id: "visaCardNumber", val: cardNumber },
+      { id: "visaExpiry", val: expiry },
+      { id: "visaCvv", val: cvv }
+    ];
+
+    visaInputs.forEach(item => {
+      const el = document.getElementById(item.id);
+      if (el) {
+        el.style.border = "";
+        el.style.boxShadow = "";
+      }
+    });
+
+    let visaMissing = false;
+    visaInputs.forEach(item => {
+      if (!item.val) {
+        const el = document.getElementById(item.id);
+        if (el) {
+          el.style.border = "1px solid #ef4444";
+          el.style.boxShadow = "0 0 8px rgba(239, 68, 68, 0.3)";
+        }
+        hasErrors = true;
+        visaMissing = true;
+      }
+    });
+
+    if (visaMissing) {
+      errorMsgs.push("الرجاء تعبئة معلومات بطاقة الفيزا كاملة.");
+    } else {
+      const cleanCard = cardNumber.replace(/\s+/g, "");
+      if (cleanCard.length < 12) {
+        const el = document.getElementById("visaCardNumber");
+        if (el) el.style.border = "1px solid #ef4444";
+        hasErrors = true;
+        errorMsgs.push("رقم بطاقة الفيزا غير صالح.");
+      }
+      if (!/^\d{2}\/\d{2}$/.test(expiry)) {
+        const el = document.getElementById("visaExpiry");
+        if (el) el.style.border = "1px solid #ef4444";
+        hasErrors = true;
+        errorMsgs.push("تاريخ انتهاء البطاقة غير صالح (صيغة MM/YY).");
+      }
+      if (cvv.length < 3) {
+        const el = document.getElementById("visaCvv");
+        if (el) el.style.border = "1px solid #ef4444";
+        hasErrors = true;
+        errorMsgs.push("رمز CVV غير صالح.");
+      }
+    }
+
+    paymentDetailsJSON = { card_number: cardNumber, expiry: expiry };
+
+  } else if (paymentMethod === "PayPal") {
+    const paypalEmail = document.getElementById("paypalEmail")?.value.trim();
+    const el = document.getElementById("paypalEmail");
+    if (el) {
+      el.style.border = "";
+      el.style.boxShadow = "";
+    }
+
+    if (!paypalEmail) {
+      if (el) {
+        el.style.border = "1px solid #ef4444";
+        el.style.boxShadow = "0 0 8px rgba(239, 68, 68, 0.3)";
+      }
+      hasErrors = true;
+      errorMsgs.push("الرجاء تعبئة البريد الإلكتروني لحساب PayPal.");
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(paypalEmail)) {
+      if (el) el.style.border = "1px solid #ef4444";
+      hasErrors = true;
+      errorMsgs.push("البريد الإلكتروني لحساب PayPal غير صالح.");
+    }
+
+    paymentDetailsJSON = { email: paypalEmail };
+  }
+
+  if (hasErrors) {
+    if (errorBanner) {
+      errorBanner.innerHTML = errorMsgs.map(msg => `<div style="margin-bottom: 4px;">⚠️ ${msg}</div>`).join("");
+      errorBanner.style.display = "block";
+      errorBanner.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    showToast("يرجى تصحيح الأخطاء وتعبئة الحقول المطلوبة!");
     if (button) {
       button.disabled = false;
       button.classList.remove("loading");
@@ -984,14 +1065,14 @@ const checkoutCart = async (event) => {
   const grandTotal = subtotal + shippingCost;
   const orderId = `TRK-${Math.floor(1000 + Math.random() * 9000)}`;
 
-  // Store the detailed structured address as a robust JSON string in the address column
+  // Store structured address details
   const addressJSON = JSON.stringify({
     recipient: recipientName,
     city,
     area,
     street,
     notes,
-    coordinates
+    payment_details: paymentDetailsJSON
   });
 
   try {
@@ -1081,9 +1162,9 @@ window.fetchAndMergeCart = fetchAndMergeCart;
 window.goToCartStep2 = goToCartStep2;
 window.goBackToStep1 = goBackToStep1;
 window.updateShippingFee = updateShippingFee;
-window.openMapPicker = openMapPicker;
-window.closeMapPickerModal = closeMapPickerModal;
-window.confirmMapLocation = confirmMapLocation;
+window.togglePaymentInputs = togglePaymentInputs;
+window.formatCardNumber = formatCardNumber;
+window.formatExpiry = formatExpiry;
 window.showMatchingSet = showMatchingSet;
 window.closeMatchOutfitModal = closeMatchOutfitModal;
 window.addMatchingOutfitToCart = addMatchingOutfitToCart;

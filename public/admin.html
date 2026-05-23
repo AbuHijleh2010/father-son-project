@@ -454,8 +454,8 @@ const openOrderDetailsModal = async (orderId) => {
       parsedAddress = { recipient: order.name, city: order.address, area: "", street: "", coordinates: "", notes: "" };
     }
 
-    const isPaid = order.payment_status === "Paid";
-    const paymentMethodText = order.payment_method === "cash" ? "كاش (عند التوصيل) 💵" : order.payment_method === "visa" ? "فيزا 💳" : "بايبال 🅿️";
+    const isPaid = order.payment_status === "Paid" || order.payment_status === "مدفوع";
+    const paymentMethodText = order.payment_method === "Visa" ? "فيزا 💳" : order.payment_method === "PayPal" ? "بايبال 🅿️" : "كاش (عند الاستلام) 💵";
 
     const itemsHTML = (order.items || []).map(item => {
       const originalPrice = parseFloat(item.price || 0);
@@ -523,6 +523,12 @@ const openOrderDetailsModal = async (orderId) => {
           <h3 style="border-bottom: 2px solid var(--secondary); padding-bottom: 6px; margin-top: 25px; font-size: 1.15rem; font-weight:700;">💳 الدفع والحالة</h3>
           <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 12px; font-size: 0.9rem;">
             <p><strong>طريقة الدفع:</strong> ${paymentMethodText}</p>
+            ${parsedAddress.payment_details
+              ? (order.payment_method === "Visa"
+                ? `<p style="background: rgba(255,255,255,0.04); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); font-size: 0.8rem; margin: 0; line-height: 1.4;">💳 <strong>البطاقة:</strong> ${parsedAddress.payment_details.card_number || "غير متوفر"}<br>📅 <strong>الانتهاء:</strong> ${parsedAddress.payment_details.expiry || "غير متوفر"}</p>`
+                : `<p style="background: rgba(255,255,255,0.04); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); font-size: 0.8rem; margin: 0; line-height: 1.4;">🅿️ <strong>بريد PayPal:</strong><br>${parsedAddress.payment_details.email || "غير متوفر"}</p>`)
+              : ""
+            }
             
             <div style="display: flex; align-items: center; justify-content: space-between;">
               <span><strong>حالة الدفع:</strong> 
@@ -561,7 +567,7 @@ const closeOrderDetailsModal = () => {
 };
 
 const togglePaymentStatusModal = async (orderId, currentStatus) => {
-  const nextStatus = currentStatus === "Paid" ? "Unpaid" : "Paid";
+  const nextStatus = (currentStatus === "Paid" || currentStatus === "مدفوع") ? "لم يتم الدفع" : "مدفوع";
   try {
     const res = await fetch("/api/orders", {
       method: "POST",
