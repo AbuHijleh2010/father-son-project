@@ -643,9 +643,15 @@ const renderCartStep2 = () => {
         </div>
 
         <!-- PayPal payment details input form -->
-        <div id="paypalPaymentDetails" style="display: none; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 15px; border-radius: 12px; margin-top: 10px; display: none; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2);">
-          <label style="display: block; margin-bottom: 4px; font-size: 0.82rem; font-weight: 700;">البريد الإلكتروني لحساب PayPal <span style="color:#ef4444">*</span></label>
-          <input id="paypalEmail" class="input-field" type="email" placeholder="example@paypal.com" style="width:100%; margin:0; font-size:0.85rem;">
+        <div id="paypalPaymentDetails" style="display: none; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); padding: 20px; border-radius: 12px; margin-top: 10px; display: none; box-shadow: inset 0 2px 4px rgba(0,0,0,0.2); text-align: center; flex-direction: column; align-items: center; gap: 8px;">
+          <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0 0 4px 0;">لتأكيد الدفع التلقائي، يرجى تسجيل الدخول الآمن لحسابك:</p>
+          <button type="button" onclick="openPayPalSimulator()" style="background: #ffc439; color: #111111; border: none; padding: 10px 20px; border-radius: 30px; font-weight: 700; font-size: 0.88rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: background 0.2s; box-shadow: 0 4px 12px rgba(255, 196, 57, 0.2);" onmouseover="this.style.background='#ebb330'" onmouseout="this.style.background='#ffc439'">
+            <span style="font-style: italic; font-weight: 900; font-size: 1.1rem; letter-spacing: -1.5px; color: #003087; font-family: sans-serif;">Pay</span><span style="font-style: italic; font-weight: 900; font-size: 1.1rem; letter-spacing: -1.5px; color: #0079c1; font-family: sans-serif;">Pal</span>
+            <span style="border-right: 1px solid rgba(0,0,0,0.15); height: 14px; margin: 0 6px;"></span>
+            <span>تسجيل الدخول الآمن 🔒</span>
+          </button>
+          <input type="hidden" id="paypalEmail">
+          <p id="paypalAuthStatus" style="font-size:0.82rem; color: #10b981; margin: 8px 0 0 0; display: none; font-weight: 700; line-height: 1.4;"></p>
         </div>
       </div>
     </div>
@@ -822,6 +828,120 @@ const addMatchingOutfitToCart = async (p1Id, p2Id) => {
   updateCartDisplay();
   showToast("👨‍👦 تم إضافة الطقم الكامل بخصم 5% إضافي للسلة!");
   renderCart();
+};
+
+const openPayPalSimulator = () => {
+  if (document.getElementById("paypalSimulatorModal")) {
+    document.getElementById("paypalSimulatorModal").style.display = "flex";
+    return;
+  }
+  
+  const modal = document.createElement("div");
+  modal.id = "paypalSimulatorModal";
+  modal.className = "modal-overlay";
+  modal.style.cssText = "position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.65); display: flex; align-items: center; justify-content: center; z-index: 10000; direction: ltr; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;";
+  modal.innerHTML = `
+    <div style="background: #ffffff; width: 90%; max-width: 440px; border-radius: 12px; box-shadow: 0 15px 35px rgba(0,0,0,0.3); overflow: hidden; color: #333333; text-align: center; padding: 30px; box-sizing: border-box; position: relative;">
+      <div style="display: flex; justify-content: center; gap: 4px; margin-bottom: 20px;">
+        <span style="font-style: italic; font-weight: 900; font-size: 1.8rem; letter-spacing: -2px; color: #003087;">Pay</span><span style="font-style: italic; font-weight: 900; font-size: 1.8rem; letter-spacing: -2px; color: #0079c1;">Pal</span>
+      </div>
+      
+      <div id="paypalSimMain">
+        <h3 style="font-size: 1.25rem; font-weight: 600; margin: 0 0 10px 0; color: #2c2e2f;">Pay with PayPal</h3>
+        <p style="font-size: 0.88rem; color: #6c7378; margin: 0 0 20px 0;">Enter your PayPal account credentials to authorize payment.</p>
+        
+        <div style="text-align: left; display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px;">
+          <div>
+            <label style="display: block; font-size: 0.8rem; font-weight: 600; color: #6c7378; margin-bottom: 5px;">Email address</label>
+            <input id="paypalSimEmail" type="email" placeholder="example@email.com" style="width: 100%; padding: 12px; border: 1px solid #cbd2d6; border-radius: 5px; box-sizing: border-box; font-size: 0.95rem; outline: none; transition: border-color 0.2s; color: #111;">
+          </div>
+          <div>
+            <label style="display: block; font-size: 0.8rem; font-weight: 600; color: #6c7378; margin-bottom: 5px;">Password</label>
+            <input id="paypalSimPassword" type="password" placeholder="••••••••" style="width: 100%; padding: 12px; border: 1px solid #cbd2d6; border-radius: 5px; box-sizing: border-box; font-size: 0.95rem; outline: none; color: #111;">
+          </div>
+        </div>
+        
+        <button onclick="submitPayPalSim()" style="background: #0070ba; color: #ffffff; border: none; width: 100%; padding: 14px; border-radius: 30px; font-weight: 700; font-size: 0.95rem; cursor: pointer; transition: background 0.2s;" onmouseover="this.style.background='#005ea6'" onmouseout="this.style.background='#0070ba'">Log In</button>
+        <button type="button" onclick="closePayPalSim()" style="background: transparent; color: #0070ba; border: none; width: 100%; padding: 10px; margin-top: 10px; font-size: 0.88rem; cursor: pointer; text-decoration: underline;">Cancel</button>
+      </div>
+
+      <div id="paypalSimLoading" style="display: none; padding: 40px 0;">
+        <div style="width: 50px; height: 50px; border: 4px solid #f3f3f3; border-top: 4px solid #0070ba; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px auto;"></div>
+        <p style="font-size: 0.95rem; font-weight: 600; color: #2c2e2f; margin: 0 0 5px 0;">Connecting to PayPal...</p>
+        <p style="font-size: 0.82rem; color: #6c7378; margin: 0;">Please wait while we secure your secure payment authorization.</p>
+      </div>
+
+      <div id="paypalSimSuccess" style="display: none; padding: 30px 0;">
+        <div style="width: 60px; height: 60px; background: #d4edda; color: #28a745; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem; margin: 0 auto 20px auto;">✓</div>
+        <h4 style="font-size: 1.15rem; color: #155724; margin: 0 0 8px 0;">Authorization Successful</h4>
+        <p style="font-size: 0.85rem; color: #155724; margin: 0 0 20px 0;">Your PayPal account has been successfully verified.</p>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  
+  // Inject spinner animation rules
+  if (!document.getElementById("paypalSpinStyles")) {
+    const styles = document.createElement("style");
+    styles.id = "paypalSpinStyles";
+    styles.innerHTML = `
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    `;
+    document.head.appendChild(styles);
+  }
+
+  document.getElementById("paypalSimulatorModal").style.display = "flex";
+};
+
+const closePayPalSim = () => {
+  const modal = document.getElementById("paypalSimulatorModal");
+  if (modal) modal.style.display = "none";
+};
+
+const submitPayPalSim = () => {
+  const email = document.getElementById("paypalSimEmail")?.value.trim();
+  const password = document.getElementById("paypalSimPassword")?.value.trim();
+
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    alert("Please enter a valid email address");
+    return;
+  }
+  if (!password || password.length < 4) {
+    alert("Please enter your password");
+    return;
+  }
+
+  // Show loading simulator
+  document.getElementById("paypalSimMain").style.display = "none";
+  document.getElementById("paypalSimLoading").style.display = "block";
+
+  setTimeout(() => {
+    document.getElementById("paypalSimLoading").style.display = "none";
+    document.getElementById("paypalSimSuccess").style.display = "block";
+
+    setTimeout(() => {
+      // Set values back to main checkout page
+      const mainInput = document.getElementById("paypalEmail");
+      if (mainInput) mainInput.value = email;
+
+      const authStatus = document.getElementById("paypalAuthStatus");
+      if (authStatus) {
+        authStatus.innerText = `✅ تم تفويض حساب PayPal بنجاح: (${email})`;
+        authStatus.style.display = "block";
+      }
+
+      closePayPalSim();
+      
+      // Reset simulator modal views for next time
+      document.getElementById("paypalSimSuccess").style.display = "none";
+      document.getElementById("paypalSimMain").style.display = "block";
+      if (document.getElementById("paypalSimEmail")) document.getElementById("paypalSimEmail").value = "";
+      if (document.getElementById("paypalSimPassword")) document.getElementById("paypalSimPassword").value = "";
+    }, 1200);
+  }, 1800);
 };
 
 const togglePaymentInputs = () => {
@@ -1167,3 +1287,6 @@ window.formatExpiry = formatExpiry;
 window.showMatchingSet = showMatchingSet;
 window.closeMatchOutfitModal = closeMatchOutfitModal;
 window.addMatchingOutfitToCart = addMatchingOutfitToCart;
+window.openPayPalSimulator = openPayPalSimulator;
+window.closePayPalSim = closePayPalSim;
+window.submitPayPalSim = submitPayPalSim;
