@@ -650,7 +650,6 @@ const renderCartStep2 = () => {
       </div>
     </div>
   `;
-  `;
 
   if (footer) {
     footer.style.display = "block";
