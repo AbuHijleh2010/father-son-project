@@ -32,6 +32,51 @@ async function writeJSONFile(filePath, data) {
   }
 }
 
+// --- DOMAIN MODEL CLASSES (Matches UML Class Diagram) ---
+class User {
+  constructor(id, username, email, password, role) {
+    this.id = id;
+    this.username = username;
+    this.email = email;
+    this.password = password;
+    this.role = role || "user";
+  }
+}
+
+class Product {
+  constructor(id, title, price, image, type, category_id, match_id, sizes, description, quantity, discount) {
+    this.id = id;
+    this.title = title;
+    this.price = parseFloat(price || 0);
+    this.image = image;
+    this.type = type;
+    this.category_id = category_id;
+    this.match_id = match_id;
+    this.sizes = sizes;
+    this.description = description;
+    this.quantity = parseInt(quantity || 0, 10);
+    this.discount = parseInt(discount || 0, 10);
+  }
+}
+
+class Order {
+  constructor(id, user_id, name, email, phone, address, items, status, total, payment_method, payment_status, shipping_cost, created_at) {
+    this.id = id;
+    this.user_id = user_id;
+    this.name = name;
+    this.email = email;
+    this.phone = phone;
+    this.address = address;
+    this.items = items || [];
+    this.status = status;
+    this.total = parseFloat(total || 0);
+    this.payment_method = payment_method;
+    this.payment_status = payment_status;
+    this.shipping_cost = parseFloat(shipping_cost || 0);
+    this.created_at = created_at;
+  }
+}
+
 // --- DATABASE LAYER (PostgreSQL with JSON Graceful Fallback) ---
 let pool = null;
 let usePostgres = false;
@@ -59,11 +104,34 @@ if (databaseUrl) {
 
 async function initializePostgresSchema() {
   try {
+    // Drop obsolete legacy cart table to clean up database schema visualizer
+    await pool.query("DROP TABLE IF EXISTS cart CASCADE");
+
+    // Check if order_items table exists, if not, perform a schema migration
+    const tableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'order_items'
+      )
+    `);
+    const schemaExists = tableCheck.rows[0].exists;
+    if (!schemaExists) {
+      console.log("Migration/First run: Re-creating tables to enforce fully relational schema...");
+      await pool.query("DROP TABLE IF EXISTS cart_items CASCADE");
+      await pool.query("DROP TABLE IF EXISTS order_items CASCADE");
+      await pool.query("DROP TABLE IF EXISTS orders CASCADE");
+      await pool.query("DROP TABLE IF EXISTS products CASCADE");
+      await pool.query("DROP TABLE IF EXISTS categories CASCADE");
+      await pool.query("DROP TABLE IF EXISTS users CASCADE");
+    }
+
     await pool.query(`CREATE TABLE IF NOT EXISTS categories (
       id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
       icon TEXT NOT NULL
     )`);
+
     await pool.query(`CREATE TABLE IF NOT EXISTS products (
       id SERIAL PRIMARY KEY,
       title TEXT NOT NULL,
@@ -71,12 +139,13 @@ async function initializePostgresSchema() {
       image TEXT,
       type TEXT NOT NULL,
       category_id INTEGER REFERENCES categories(id) ON DELETE SET NULL,
-      match_id INTEGER,
+      match_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
       sizes TEXT,
       description TEXT,
       quantity INTEGER DEFAULT 0,
       discount INTEGER DEFAULT 0
     )`);
+
     await pool.query(`CREATE TABLE IF NOT EXISTS users (
       id SERIAL PRIMARY KEY,
       username TEXT UNIQUE NOT NULL,
@@ -84,33 +153,40 @@ async function initializePostgresSchema() {
       password TEXT NOT NULL,
       role TEXT DEFAULT 'user'
     )`);
+
     await pool.query(`CREATE TABLE IF NOT EXISTS orders (
       id TEXT PRIMARY KEY,
+      user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
       name TEXT,
       email TEXT,
       phone TEXT,
       address TEXT,
-      items TEXT,
       status TEXT,
       total DOUBLE PRECISION,
-      created_at TEXT
-    )`);
-    await pool.query(`CREATE TABLE IF NOT EXISTS cart (
-      username TEXT PRIMARY KEY,
-      items TEXT NOT NULL
+      created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+      payment_status TEXT DEFAULT 'لم يتم الدفع',
+      payment_method TEXT DEFAULT 'كاش عند الاستلام',
+      shipping_cost DOUBLE PRECISION DEFAULT 0
     )`);
 
-    // Alter schema dynamically for new columns & non-unique username constraints
-    try {
-      await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_status TEXT DEFAULT 'لم يتم الدفع'`);
-      await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'كاش عند الاستلام'`);
-      await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping_cost DOUBLE PRECISION DEFAULT 0`);
-      await pool.query(`ALTER TABLE users DROP CONSTRAINT IF EXISTS users_username_key`);
-    } catch (alterErr) {
-      console.warn("Schema alters warning:", alterErr.message);
-    }
+    await pool.query(`CREATE TABLE IF NOT EXISTS order_items (
+      id SERIAL PRIMARY KEY,
+      order_id TEXT REFERENCES orders(id) ON DELETE CASCADE,
+      product_id INTEGER REFERENCES products(id) ON DELETE SET NULL,
+      quantity INTEGER NOT NULL CHECK (quantity > 0),
+      price DOUBLE PRECISION NOT NULL,
+      size TEXT
+    )`);
 
-    // Seed default categories
+    await pool.query(`CREATE TABLE IF NOT EXISTS cart_items (
+      user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+      product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
+      quantity INTEGER NOT NULL CHECK (quantity > 0),
+      size TEXT,
+      PRIMARY KEY (user_id, product_id, size)
+    )`);
+
+    // Seed default categories if empty
     const catCheck = await pool.query("SELECT COUNT(*) as count FROM categories");
     if (parseInt(catCheck.rows[0].count, 10) === 0) {
       const initialCategories = [
@@ -126,7 +202,7 @@ async function initializePostgresSchema() {
       }
     }
 
-    // Seed default admin
+    // Seed default admin if empty
     const userCheck = await pool.query("SELECT COUNT(*) as count FROM users");
     if (parseInt(userCheck.rows[0].count, 10) === 0) {
       await pool.query(
@@ -135,7 +211,7 @@ async function initializePostgresSchema() {
       );
     }
     
-    // Seed default products
+    // Seed default products if empty
     const prodCheck = await pool.query("SELECT COUNT(*) as count FROM products");
     if (parseInt(prodCheck.rows[0].count, 10) === 0) {
       await pool.query(`
@@ -147,7 +223,7 @@ async function initializePostgresSchema() {
         "https://images.unsplash.com/photo-1617137968427-85924c800a22?w=500&auto=format&fit=crop", 
         "father", 
         4, // أطقم كاملة
-        101, 
+        null, 
         "S,M,L,XL", 
         "طقم أنيق وعصري ومريح للأب مناسب لجميع الخروجات اليومية.", 
         10, 
@@ -162,12 +238,23 @@ async function initializePostgresSchema() {
         "https://images.unsplash.com/photo-1519457431-44ccd64a579b?w=500&auto=format&fit=crop", 
         "child", 
         4, // أطقم كاملة
-        101, 
+        null, 
         "2T,4T,6T,8T", 
         "طقم مريح وجميل للطفل، يتناسق تماماً مع إطلالة الأب.", 
         15, 
         10
       ]);
+
+      // Connect them as a matching set
+      const prods = await pool.query("SELECT id, type FROM products ORDER BY id ASC");
+      if (prods.rows.length >= 2) {
+        const fatherId = prods.rows.find(p => p.type === 'father')?.id;
+        const childId = prods.rows.find(p => p.type === 'child')?.id;
+        if (fatherId && childId) {
+          await pool.query("UPDATE products SET match_id = $1 WHERE id = $2", [childId, fatherId]);
+          await pool.query("UPDATE products SET match_id = $1 WHERE id = $2", [fatherId, childId]);
+        }
+      }
     }
     console.log("PostgreSQL schema and seeding completed successfully.");
   } catch (err) {
@@ -175,7 +262,7 @@ async function initializePostgresSchema() {
   }
 }
 
-const DB = {
+class DBHelper {
   // CATEGORIES
   async getCategories() {
     if (usePostgres) {
@@ -190,7 +277,7 @@ const DB = {
       { id: 5, name: "أحذية", icon: "👟" },
       { id: 6, name: "إكسسوارات", icon: "⌚" },
     ]);
-  },
+  }
 
   async saveCategory(category) {
     if (usePostgres) {
@@ -221,7 +308,7 @@ const DB = {
     categories.push(category);
     await writeJSONFile(CATEGORIES_FILE, categories);
     return category;
-  },
+  }
 
   async deleteCategory(id) {
     if (usePostgres) {
@@ -232,7 +319,7 @@ const DB = {
     const filtered = categories.filter((c) => c.id != id);
     await writeJSONFile(CATEGORIES_FILE, filtered);
     return categories.length !== filtered.length;
-  },
+  }
 
   // PRODUCTS
   async getProducts() {
@@ -244,12 +331,12 @@ const DB = {
         price: parseFloat(p.price),
         quantity: parseInt(p.quantity || 0, 10),
         discount: parseInt(p.discount || 0, 10),
-        match_id: parseInt(p.match_id || 0, 10),
+        match_id: p.match_id ? parseInt(p.match_id, 10) : null,
         category_id: p.category_id ? parseInt(p.category_id, 10) : null,
       }));
     }
     return readJSONFile(PRODUCTS_FILE, []);
-  },
+  }
 
   async saveProduct(product) {
     const sizesStr = Array.isArray(product.sizes) ? product.sizes.join(",") : (product.sizes || "");
@@ -311,7 +398,7 @@ const DB = {
       await writeJSONFile(PRODUCTS_FILE, products);
       return newProduct;
     }
-  },
+  }
 
   async deleteProduct(id) {
     if (usePostgres) {
@@ -322,7 +409,7 @@ const DB = {
     const filtered = products.filter((p) => p.id.toString() !== id.toString());
     await writeJSONFile(PRODUCTS_FILE, filtered);
     return products.length !== filtered.length;
-  },
+  }
 
   // USERS
   async getUsers() {
@@ -333,7 +420,7 @@ const DB = {
     return readJSONFile(USERS_FILE, [
       { username: "admin", email: "admin@store.com", password: "admin123", role: "admin" }
     ]);
-  },
+  }
 
   async createUser(user) {
     if (usePostgres) {
@@ -347,7 +434,7 @@ const DB = {
     users.push(user);
     await writeJSONFile(USERS_FILE, users);
     return user;
-  },
+  }
 
   // ORDERS
   async getOrders(username = null) {
@@ -358,55 +445,100 @@ const DB = {
         query += " WHERE name = $1 OR email = $2";
         params.push(username, username);
       }
+      query += " ORDER BY created_at DESC";
       const res = await pool.query(query, params);
-      return res.rows.map((row) => ({
-        ...row,
-        items: JSON.parse(row.items || "[]"),
-        total: parseFloat(row.total),
-        shipping_cost: parseFloat(row.shipping_cost || 0),
-      }));
+      
+      const orders = res.rows;
+      for (const order of orders) {
+        // Query order_items for this order
+        const itemsRes = await pool.query(`
+          SELECT oi.product_id as id, oi.quantity, oi.price, oi.size, p.title, p.image, p.discount
+          FROM order_items oi
+          LEFT JOIN products p ON oi.product_id = p.id
+          WHERE oi.order_id = $1
+        `, [order.id]);
+        
+        order.items = itemsRes.rows.map(item => ({
+          id: item.id,
+          title: item.title || "منتج غير معروف",
+          quantity: item.quantity,
+          price: parseFloat(item.price),
+          size: item.size || "",
+          image: item.image || "",
+          discount: parseInt(item.discount || 0, 10)
+        }));
+        order.total = parseFloat(order.total);
+        order.shipping_cost = parseFloat(order.shipping_cost || 0);
+      }
+      return orders;
     }
     const orders = await readJSONFile(ORDERS_FILE, []);
     if (username) {
       return orders.filter(o => o.name === username || o.email === username);
     }
     return orders;
-  },
+  }
 
   async createOrder(order) {
-    const itemsStr = JSON.stringify(order.items || []);
     if (usePostgres) {
+      // Look up user_id
+      let userId = null;
+      const userRes = await pool.query("SELECT id FROM users WHERE username = $1 OR email = $2 LIMIT 1", [order.name, order.email]);
+      if (userRes.rows.length > 0) {
+        userId = userRes.rows[0].id;
+      }
+      
       const res = await pool.query(
-        `INSERT INTO orders (id, name, email, phone, address, items, status, total, created_at, payment_status, payment_method, shipping_cost) 
+        `INSERT INTO orders (id, user_id, name, email, phone, address, status, total, created_at, payment_status, payment_method, shipping_cost) 
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *`,
         [
           order.id,
+          userId,
           order.name,
           order.email,
           order.phone,
           order.address,
-          itemsStr,
           order.status,
-          order.total,
-          order.created_at,
+          parseFloat(order.total),
+          order.created_at || new Date().toISOString(),
           order.payment_status || "لم يتم الدفع",
           order.payment_method || "كاش عند الاستلام",
           parseFloat(order.shipping_cost || 0),
         ]
       );
       const o = res.rows[0];
-      return o ? { 
-        ...o, 
-        items: JSON.parse(o.items || "[]"), 
-        total: parseFloat(o.total),
-        shipping_cost: parseFloat(o.shipping_cost || 0)
-      } : null;
+      
+      // Insert order_items
+      if (order.items && Array.isArray(order.items)) {
+        for (const item of order.items) {
+          if (!item.id) continue;
+          // Verify if product exists to avoid foreign key violations from stale caches
+          const prodCheck = await pool.query("SELECT id FROM products WHERE id = $1", [item.id]);
+          if (prodCheck.rows.length === 0) {
+            console.warn(`Product ID ${item.id} not found in database. Skipping order item.`);
+            continue;
+          }
+          await pool.query(
+            `INSERT INTO order_items (order_id, product_id, quantity, price, size)
+             VALUES ($1, $2, $3, $4, $5)`,
+            [order.id, item.id, item.quantity, parseFloat(item.price), item.size || ""]
+          );
+        }
+      }
+      
+      if (o) {
+        o.items = order.items || [];
+        o.total = parseFloat(o.total);
+        o.shipping_cost = parseFloat(o.shipping_cost || 0);
+        return o;
+      }
+      return null;
     }
     const orders = await this.getOrders();
     orders.push(order);
     await writeJSONFile(ORDERS_FILE, orders);
     return order;
-  },
+  }
 
   async updateOrderStatus(id, status) {
     if (usePostgres) {
@@ -421,26 +553,66 @@ const DB = {
       return true;
     }
     return false;
-  },
+  }
 
   // CART
   async getCart(username) {
     if (usePostgres) {
-      const res = await pool.query("SELECT items FROM cart WHERE username = $1", [username]);
-      return res.rows[0] ? JSON.parse(res.rows[0].items) : [];
+      // Look up user_id
+      const userRes = await pool.query("SELECT id FROM users WHERE username = $1 LIMIT 1", [username]);
+      if (userRes.rows.length === 0) return [];
+      const userId = userRes.rows[0].id;
+
+      const res = await pool.query(`
+        SELECT ci.product_id as id, ci.quantity, ci.size, p.title, p.price, p.image, p.discount, p.sizes as available_sizes
+        FROM cart_items ci
+        LEFT JOIN products p ON ci.product_id = p.id
+        WHERE ci.user_id = $1
+      `, [userId]);
+
+      return res.rows.map(row => ({
+        id: row.id,
+        title: row.title || "منتج غير معروف",
+        price: parseFloat(row.price || 0),
+        image: row.image || "",
+        discount: parseInt(row.discount || 0, 10),
+        quantity: row.quantity,
+        size: row.size || "",
+        sizes: row.available_sizes ? row.available_sizes.split(",") : []
+      }));
     }
     const carts = await readJSONFile(CARTS_FILE, {});
     return carts[username] || [];
-  },
+  }
 
   async saveCart(username, items) {
-    const itemsStr = JSON.stringify(items);
     if (usePostgres) {
-      await pool.query(
-        `INSERT INTO cart (username, items) VALUES ($1, $2) 
-         ON CONFLICT(username) DO UPDATE SET items = EXCLUDED.items`,
-        [username, itemsStr]
-      );
+      // Look up user_id
+      const userRes = await pool.query("SELECT id FROM users WHERE username = $1 LIMIT 1", [username]);
+      if (userRes.rows.length === 0) return false;
+      const userId = userRes.rows[0].id;
+
+      // Delete existing cart items
+      await pool.query("DELETE FROM cart_items WHERE user_id = $1", [userId]);
+
+      // Insert new cart items
+      if (items && Array.isArray(items)) {
+        for (const item of items) {
+          if (!item.id) continue;
+          // Verify if product exists to avoid foreign key violations from stale caches
+          const prodCheck = await pool.query("SELECT id FROM products WHERE id = $1", [item.id]);
+          if (prodCheck.rows.length === 0) {
+            console.warn(`Product ID ${item.id} not found in database. Skipping cart item.`);
+            continue;
+          }
+          await pool.query(`
+            INSERT INTO cart_items (user_id, product_id, quantity, size)
+            VALUES ($1, $2, $3, $4)
+            ON CONFLICT (user_id, product_id, size) 
+            DO UPDATE SET quantity = EXCLUDED.quantity
+          `, [userId, item.id, item.quantity || 1, item.size || ""]);
+        }
+      }
       return true;
     }
     const carts = await readJSONFile(CARTS_FILE, {});
@@ -448,7 +620,8 @@ const DB = {
     await writeJSONFile(CARTS_FILE, carts);
     return true;
   }
-};
+}
+const DB = new DBHelper();
 
 const getRequestBody = (req) => {
   return new Promise((resolve, reject) => {
@@ -480,8 +653,13 @@ const mimeTypes = {
   txt: "text/plain; charset=utf-8",
 };
 
-const server = http.createServer(async (req, res) => {
-  try {
+class Server {
+  constructor(port) {
+    this.port = port;
+  }
+
+  async handleRequest(req, res) {
+    try {
     const requestUrl = decodeURIComponent(req.url.split("?")[0]);
 
     // Set CORS headers for all requests
@@ -753,11 +931,17 @@ const server = http.createServer(async (req, res) => {
 
     res.writeHead(200, { "Content-Type": contentType });
     fs.createReadStream(fullPath).pipe(res);
-  } catch (error) {
-    console.error("Server execution error:", error);
-    res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
-    res.end(JSON.stringify({ error: "Server error" }));
+    } catch (error) {
+      console.error("Server execution error:", error);
+      res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ error: "Server error" }));
+    }
   }
+}
+
+const appServer = new Server(port);
+const server = http.createServer(async (req, res) => {
+  await appServer.handleRequest(req, res);
 });
 
 if (require.main === module) {
