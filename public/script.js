@@ -319,24 +319,38 @@ const changeCartItemQuantity = async (id, size, delta) => {
   );
   if (!item) return;
 
+  const currentQuantity = item.quantity || 1;
+  const newQuantity = currentQuantity + delta;
+  
+  if (newQuantity <= 0) {
+    removeCartItem(id, size);
+    renderCart();
+    return;
+  }
+
+  // Optimistic UI Update: Update quantity in local storage and render instantly
+  item.quantity = newQuantity;
+  saveCartItems(cartItems);
+  renderCart();
+
+  // Validate stock in background to avoid blocking the UI
   try {
     const res = await fetch("/api/products");
     const products = await res.json();
     const product = products.find((p) => p.id == id);
-    const currentQuantity = item.quantity || 1;
-    if (delta > 0 && product && currentQuantity + 1 > (product.quantity || 0)) {
-      return showToast("لا توجد كمية كافية في المخزون لزيادة الكمية");
+    if (product && newQuantity > (product.quantity || 0)) {
+      showToast("لا توجد كمية كافية في المخزون لزيادة الكمية");
+      // Rollback to maximum available stock or previous quantity
+      item.quantity = Math.min(product.quantity || 0, currentQuantity);
+      if (item.quantity <= 0) {
+        removeCartItem(id, size);
+      } else {
+        saveCartItems(cartItems);
+      }
+      renderCart();
     }
-
-    item.quantity = Math.max(0, currentQuantity + delta);
-    if (item.quantity <= 0) {
-      removeCartItem(id, size);
-    } else {
-      saveCartItems(cartItems);
-    }
-    renderCart();
   } catch (err) {
-    console.error("Failed to update cart quantity:", err);
+    console.error("Failed to validate stock in background:", err);
   }
 };
 
