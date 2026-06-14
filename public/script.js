@@ -439,28 +439,53 @@ document.addEventListener("DOMContentLoaded", () => {
     lucide.createIcons();
   }
 
-  // Mouse cursor follower logic
+  // Mouse cursor follower logic with requestAnimationFrame (Ultra Smooth & 0 Lag)
   const cursor = document.getElementById("cursor");
   const follower = document.getElementById("follower");
   if (cursor && follower) {
+    let mouseX = 0, mouseY = 0;
+    let cursorX = 0, cursorY = 0;
+    let followerX = 0, followerY = 0;
+    let targetScale = 1;
+    let currentScale = 1;
+    let hasMoved = false;
+
     document.addEventListener("mousemove", (e) => {
-      cursor.style.transform = `translate3d(${e.clientX}px, ${e.clientY}px, 0)`;
-      follower.style.transform = `translate3d(${e.clientX - 10}px, ${e.clientY - 10}px, 0)`;
+      mouseX = e.clientX;
+      mouseY = e.clientY;
+      if (!hasMoved) {
+        cursorX = followerX = mouseX;
+        cursorY = followerY = mouseY;
+        hasMoved = true;
+      }
     });
+
+    const updatePosition = () => {
+      if (hasMoved) {
+        cursorX = mouseX;
+        cursorY = mouseY;
+        cursor.style.transform = `translate3d(${cursorX}px, ${cursorY}px, 0)`;
+        
+        followerX += (mouseX - 10 - followerX) * 0.15;
+        followerY += (mouseY - 10 - followerY) * 0.15;
+        
+        currentScale += (targetScale - currentScale) * 0.15;
+        follower.style.transform = `translate3d(${followerX}px, ${followerY}px, 0) scale(${currentScale})`;
+      }
+      requestAnimationFrame(updatePosition);
+    };
+    requestAnimationFrame(updatePosition);
 
     const interactables = document.querySelectorAll(
       "button, a, .category-card, .product-card",
     );
     interactables.forEach((el) => {
       el.addEventListener("mouseenter", () => {
-        follower.style.transform += " scale(1.5)";
+        targetScale = 1.5;
         follower.style.background = "rgba(255,255,255,0.1)";
       });
       el.addEventListener("mouseleave", () => {
-        follower.style.transform = follower.style.transform.replace(
-          " scale(1.5)",
-          "",
-        );
+        targetScale = 1;
         follower.style.background = "transparent";
       });
     });

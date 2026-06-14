@@ -74,7 +74,7 @@ body {
   pointer-events: none;
   z-index: 9999;
   mix-blend-mode: difference;
-  transition: transform 0.2s ease;
+  transition: none;
 }
 
 .cursor-follower {
@@ -85,7 +85,7 @@ body {
   position: fixed;
   pointer-events: none;
   z-index: 9998;
-  transition: transform 0.3s ease, background 0.3s ease;
+  transition: background 0.3s ease;
 }
 
 .container {

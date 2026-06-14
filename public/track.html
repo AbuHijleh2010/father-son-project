@@ -305,8 +305,17 @@ const renderCustomerOrders = async () => {
           `;
         }).join("");
 
-        const paymentMethodText = order.payment_method === "cash" ? "كاش (عند الاستلام) 💵" : order.payment_method === "visa" ? "فيزا 💳" : "بايبال 🅿️";
-        const paymentStatusText = order.payment_status === "Paid" ? "تم الدفع ✅" : "لم يتم الدفع ❌";
+        const pMethod = String(order.payment_method || "").toLowerCase().trim();
+        const paymentMethodText = (pMethod === "cash" || pMethod === "كاش عند الاستلام") 
+          ? "كاش (عند الاستلام) 💵" 
+          : (pMethod === "visa" || pMethod === "فيزا") 
+            ? "فيزا 💳" 
+            : "بايبال 🅿️";
+
+        const pStatus = String(order.payment_status || "").trim();
+        const paymentStatusText = (pStatus === "Paid" || pStatus === "مدفوع") 
+          ? "تم الدفع ✅" 
+          : "لم يتم الدفع ❌";
 
         return `
         <div class="glass" style="padding: 28px; border-radius: var(--radius-lg); margin-bottom: 22px; text-align: right;">
