@@ -97,9 +97,11 @@ if (databaseUrl) {
     initializePostgresSchema();
   } catch (err) {
     console.error("Failed to initialize PostgreSQL, falling back to JSON:", err.message);
+    initializeJsonSchema();
   }
 } else {
   console.log("DATABASE_URL not found in env. Falling back to local JSON database.");
+  initializeJsonSchema();
 }
 
 async function initializePostgresSchema() {
@@ -216,52 +218,276 @@ async function initializePostgresSchema() {
     
     // Seed default products if empty
     const prodCheck = await pool.query("SELECT COUNT(*) as count FROM products");
-    if (parseInt(prodCheck.rows[0].count, 10) === 0) {
-      await pool.query(`
-        INSERT INTO products (title, price, image, type, category_id, match_id, sizes, description, quantity, discount) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-      `, [
-        "طقم كاجوال متناسق للأب", 
-        120.0, 
-        "https://images.unsplash.com/photo-1617137968427-85924c800a22?w=500&auto=format&fit=crop", 
-        "father", 
-        4, // أطقم كاملة
-        null, 
-        "S,M,L,XL", 
-        "طقم أنيق وعصري ومريح للأب مناسب لجميع الخروجات اليومية.", 
-        10, 
-        15
-      ]);
-      await pool.query(`
-        INSERT INTO products (title, price, image, type, category_id, match_id, sizes, description, quantity, discount) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-      `, [
-        "طقم كاجوال متناسق للطفل", 
-        80.0, 
-        "https://images.unsplash.com/photo-1519457431-44ccd64a579b?w=500&auto=format&fit=crop", 
-        "child", 
-        4, // أطقم كاملة
-        null, 
-        "2T,4T,6T,8T", 
-        "طقم مريح وجميل للطفل، يتناسق تماماً مع إطلالة الأب.", 
-        15, 
-        10
-      ]);
+    if (parseInt(prodCheck.rows[0].count, 10) <= 2) {
+      // Clear legacy products to avoid mixing
+      await pool.query("DELETE FROM products CASCADE");
+      
+      const seedProducts = [
+        {
+          title: "طقم كتان صيفي للأب",
+          price: 180.0,
+          image: "https://images.unsplash.com/photo-1617137968427-85924c800a22?w=600&auto=format&fit=crop",
+          type: "father",
+          category_id: 4, // أطقم كاملة
+          sizes: "S,M,L,XL,XXL",
+          description: "طقم كتان صيفي أنيق وعصري للأب، مريح جداً ومناسب للأجواء الحارة والزيارات.",
+          quantity: 15,
+          discount: 10,
+          tag: "set1"
+        },
+        {
+          title: "طقم كتان صيفي متناسق للطفل",
+          price: 120.0,
+          image: "https://images.unsplash.com/photo-1519457431-44ccd64a579b?w=600&auto=format&fit=crop",
+          type: "child",
+          category_id: 4, // أطقم كاملة
+          sizes: "2-3Y,4-5Y,6-7Y,8-9Y",
+          description: "طقم كتان صيفي متناسق للطفل، خفيف ومريح للحركة واللعب طوال اليوم.",
+          quantity: 20,
+          discount: 5,
+          tag: "set1"
+        },
+        {
+          title: "بدلة رياضية كاجوال للأب",
+          price: 220.0,
+          image: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600&auto=format&fit=crop",
+          type: "father",
+          category_id: 4, // أطقم كاملة
+          sizes: "S,M,L,XL,XXL",
+          description: "بدلة رياضية مريحة وعصرية للأب، مثالية للأنشطة اليومية والرياضية بتصميم أنيق.",
+          quantity: 12,
+          discount: 15,
+          tag: "set2"
+        },
+        {
+          title: "بدلة رياضية كاجوال متناسقة للطفل",
+          price: 150.0,
+          image: "https://images.unsplash.com/photo-1622290319146-7b63df48a635?w=600&auto=format&fit=crop",
+          type: "child",
+          category_id: 4, // أطقم كاملة
+          sizes: "4-5Y,6-7Y,8-9Y,10-11Y",
+          description: "بدلة رياضية متناسقة للطفل، مصممة من خامات قطنية ناعمة ومقاومة للعب الطويل.",
+          quantity: 18,
+          discount: 10,
+          tag: "set2"
+        },
+        {
+          title: "قميص جينز كلاسيكي للأب",
+          price: 140.0,
+          image: "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=600&auto=format&fit=crop",
+          type: "father",
+          category_id: 2, // بلايز
+          sizes: "S,M,L,XL,XXL",
+          description: "قميص جينز عصري بأكمام طويلة للأب، مصنوع من قطن الدنيم الفاخر عالي الجودة.",
+          quantity: 25,
+          discount: 0,
+          tag: "set3"
+        },
+        {
+          title: "قميص جينز كلاسيكي متناسق للطفل",
+          price: 95.0,
+          image: "https://images.unsplash.com/photo-1503919545889-aef636e10ad4?w=600&auto=format&fit=crop",
+          type: "child",
+          category_id: 2, // بلايز
+          sizes: "2-3Y,4-5Y,6-7Y,8-9Y,10-11Y",
+          description: "قميص جينز متناسق للطفل، يضفي لمسة من الأناقة والرجولة للمناسبات العائلية.",
+          quantity: 30,
+          discount: 0,
+          tag: "set3"
+        },
+        {
+          title: "حذاء رياضي مريح للأب",
+          price: 190.0,
+          image: "https://images.unsplash.com/photo-1549298916-b41d501d3772?w=600&auto=format&fit=crop",
+          type: "father",
+          category_id: 5, // أحذية
+          sizes: "S,M,L,XL",
+          description: "حذاء كاجوال خفيف وأنيق للأب، يوفر راحة فائقة للمشي والحركة طوال اليوم.",
+          quantity: 10,
+          discount: 20,
+          tag: "set4"
+        },
+        {
+          title: "حذاء رياضي متناسق للطفل",
+          price: 130.0,
+          image: "https://images.unsplash.com/photo-1514989940723-e8e51635b782?w=600&auto=format&fit=crop",
+          type: "child",
+          category_id: 5, // أحذية
+          sizes: "4-5Y,6-7Y,8-9Y",
+          description: "حذاء رياضي متناسق للأطفال، سهل الارتداء ومضاد للانزلاق لحماية طفلك أثناء الجري.",
+          quantity: 15,
+          discount: 10,
+          tag: "set4"
+        }
+      ];
 
-      // Connect them as a matching set
-      const prods = await pool.query("SELECT id, type FROM products ORDER BY id ASC");
-      if (prods.rows.length >= 2) {
-        const fatherId = prods.rows.find(p => p.type === 'father')?.id;
-        const childId = prods.rows.find(p => p.type === 'child')?.id;
-        if (fatherId && childId) {
-          await pool.query("UPDATE products SET match_id = $1 WHERE id = $2", [childId, fatherId]);
-          await pool.query("UPDATE products SET match_id = $1 WHERE id = $2", [fatherId, childId]);
+      const insertedIds = [];
+      for (const p of seedProducts) {
+        const res = await pool.query(`
+          INSERT INTO products (title, price, image, type, category_id, match_id, sizes, description, quantity, discount) 
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id
+        `, [
+          p.title,
+          p.price,
+          p.image,
+          p.type,
+          p.category_id,
+          null,
+          p.sizes,
+          p.description,
+          p.quantity,
+          p.discount
+        ]);
+        insertedIds.push({ id: res.rows[0].id, type: p.type, tag: p.tag });
+      }
+
+      // Link matching sets
+      for (const item of insertedIds) {
+        if (item.type === "father") {
+          const childMatch = insertedIds.find(p => p.tag === item.tag && p.type === "child");
+          if (childMatch) {
+            await pool.query("UPDATE products SET match_id = $1 WHERE id = $2", [childMatch.id, item.id]);
+            await pool.query("UPDATE products SET match_id = $1 WHERE id = $2", [item.id, childMatch.id]);
+          }
         }
       }
     }
     console.log("PostgreSQL schema and seeding completed successfully.");
   } catch (err) {
     console.error("PostgreSQL schema initialization failed:", err.message);
+  }
+}
+
+async function initializeJsonSchema() {
+  try {
+    // Categories seed
+    const categories = await readJSONFile(CATEGORIES_FILE, []);
+    if (categories.length === 0) {
+      const initialCategories = [
+        { id: 1, name: "تخفيضات", icon: "🔥" },
+        { id: 2, name: "بلايز", icon: "👕" },
+        { id: 3, name: "جينز", icon: "👖" },
+        { id: 4, name: "أطقم كاملة", icon: "👔" },
+        { id: 5, name: "أحذية", icon: "👟" },
+        { id: 6, name: "إكسسوارات", icon: "⌚" },
+      ];
+      await writeJSONFile(CATEGORIES_FILE, initialCategories);
+    }
+
+    // Products seed
+    const products = await readJSONFile(PRODUCTS_FILE, []);
+    if (products.length <= 2) {
+      const seedProducts = [
+        {
+          id: 1,
+          title: "طقم كتان صيفي للأب",
+          price: 180.0,
+          image: "https://images.unsplash.com/photo-1617137968427-85924c800a22?w=600&auto=format&fit=crop",
+          type: "father",
+          category_id: 4,
+          sizes: ["S", "M", "L", "XL", "XXL"],
+          description: "طقم كتان صيفي أنيق وعصري للأب، مريح جداً ومناسب للأجواء الحارة والزيارات.",
+          quantity: 15,
+          discount: 10,
+          match_id: 2
+        },
+        {
+          id: 2,
+          title: "طقم كتان صيفي متناسق للطفل",
+          price: 120.0,
+          image: "https://images.unsplash.com/photo-1519457431-44ccd64a579b?w=600&auto=format&fit=crop",
+          type: "child",
+          category_id: 4,
+          sizes: ["2-3Y", "4-5Y", "6-7Y", "8-9Y"],
+          description: "طقم كتان صيفي متناسق للطفل، خفيف ومريح للحركة واللعب طوال اليوم.",
+          quantity: 20,
+          discount: 5,
+          match_id: 1
+        },
+        {
+          id: 3,
+          title: "بدلة رياضية كاجوال للأب",
+          price: 220.0,
+          image: "https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600&auto=format&fit=crop",
+          type: "father",
+          category_id: 4,
+          sizes: ["S", "M", "L", "XL", "XXL"],
+          description: "بدلة رياضية مريحة وعصرية للأب، مثالية للأنشطة اليومية والرياضية بتصميم أنيق.",
+          quantity: 12,
+          discount: 15,
+          match_id: 4
+        },
+        {
+          id: 4,
+          title: "بدلة رياضية كاجوال متناسقة للطفل",
+          price: 150.0,
+          image: "https://images.unsplash.com/photo-1622290319146-7b63df48a635?w=600&auto=format&fit=crop",
+          type: "child",
+          category_id: 4,
+          sizes: ["4-5Y", "6-7Y", "8-9Y", "10-11Y"],
+          description: "بدلة رياضية متناسقة للطفل، مصممة من خامات قطنية ناعمة ومقاومة للعب الطويل.",
+          quantity: 18,
+          discount: 10,
+          match_id: 3
+        },
+        {
+          id: 5,
+          title: "قميص جينز كلاسيكي للأب",
+          price: 140.0,
+          image: "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=600&auto=format&fit=crop",
+          type: "father",
+          category_id: 2,
+          sizes: ["S", "M", "L", "XL", "XXL"],
+          description: "قميص جينز عصري بأكمام طويلة للأب، مصنوع من قطن الدنيم الفاخر عالي الجودة.",
+          quantity: 25,
+          discount: 0,
+          match_id: 6
+        },
+        {
+          id: 6,
+          title: "قميص جينز كلاسيكي متناسق للطفل",
+          price: 95.0,
+          image: "https://images.unsplash.com/photo-1503919545889-aef636e10ad4?w=600&auto=format&fit=crop",
+          type: "child",
+          category_id: 2,
+          sizes: ["2-3Y", "4-5Y", "6-7Y", "8-9Y", "10-11Y"],
+          description: "قميص جينز متناسق للطفل، يضفي لمسة من الأناقة والرجولة للمناسبات العائلية.",
+          quantity: 30,
+          discount: 0,
+          match_id: 5
+        },
+        {
+          id: 7,
+          title: "حذاء رياضي مريح للأب",
+          price: 190.0,
+          image: "https://images.unsplash.com/photo-1549298916-b41d501d3772?w=600&auto=format&fit=crop",
+          type: "father",
+          category_id: 5,
+          sizes: ["S", "M", "L", "XL"],
+          description: "حذاء كاجوال خفيف وأنيق للأب، يوفر راحة فائقة للمشي والحركة طوال اليوم.",
+          quantity: 10,
+          discount: 20,
+          match_id: 8
+        },
+        {
+          id: 8,
+          title: "حذاء رياضي متناسق للطفل",
+          price: 130.0,
+          image: "https://images.unsplash.com/photo-1514989940723-e8e51635b782?w=600&auto=format&fit=crop",
+          type: "child",
+          category_id: 5,
+          sizes: ["4-5Y", "6-7Y", "8-9Y"],
+          description: "حذاء رياضي متناسق للأطفال، سهل الارتداء ومضاد للانزلاق لحماية طفلك أثناء الجري.",
+          quantity: 15,
+          discount: 10,
+          match_id: 7
+        }
+      ];
+      await writeJSONFile(PRODUCTS_FILE, seedProducts);
+    }
+    console.log("JSON schema and seeding completed successfully.");
+  } catch (err) {
+    console.error("Failed to seed JSON database:", err.message);
   }
 }
 

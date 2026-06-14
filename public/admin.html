@@ -988,7 +988,7 @@ const renderAdminOrders = async () => {
                       ${order.status}
                     </span>
                   </td>
-                  <td>${Number(order.total).toFixed(2)}$</td>
+                  <td>${Number(order.total).toFixed(2)} ₪</td>
                   <td>${new Date(order.created_at || order.date || "").toLocaleDateString("ar-EG", {
                     day: "numeric",
                     month: "long",

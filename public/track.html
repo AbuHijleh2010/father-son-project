@@ -306,11 +306,11 @@ const renderCustomerOrders = async () => {
         }).join("");
 
         const pMethod = String(order.payment_method || "").toLowerCase().trim();
-        const paymentMethodText = (pMethod === "cash" || pMethod === "كاش عند الاستلام") 
-          ? "كاش (عند الاستلام) 💵" 
-          : (pMethod === "visa" || pMethod === "فيزا") 
-            ? "فيزا 💳" 
-            : "بايبال 🅿️";
+        const paymentMethodText = (pMethod === "visa" || pMethod === "فيزا") 
+          ? "فيزا 💳" 
+          : (pMethod === "paypal" || pMethod === "paypal 🅿️") 
+            ? "بايبال 🅿️" 
+            : "كاش (عند الاستلام) 💵";
 
         const pStatus = String(order.payment_status || "").trim();
         const paymentStatusText = (pStatus === "Paid" || pStatus === "مدفوع") 

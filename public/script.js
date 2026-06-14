@@ -1171,11 +1171,11 @@ const checkoutCart = async (event) => {
         el.style.boxShadow = "0 0 8px rgba(239, 68, 68, 0.3)";
       }
       hasErrors = true;
-      errorMsgs.push("الرجاء تعبئة البريد الإلكتروني لحساب PayPal.");
+      errorMsgs.push("الرجاء إتمام عملية تفويض الدفع عبر PayPal بالضغط على زر تسجيل الدخول الآمن 🔒.");
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(paypalEmail)) {
       if (el) el.style.border = "1px solid #ef4444";
       hasErrors = true;
-      errorMsgs.push("البريد الإلكتروني لحساب PayPal غير صالح.");
+      errorMsgs.push("تفويض PayPal غير صالح. يرجى إعادة التفويض.");
     }
 
     paymentDetailsJSON = { email: paypalEmail };
