@@ -186,6 +186,9 @@ async function initializePostgresSchema() {
       PRIMARY KEY (user_id, product_id, size)
     )`);
 
+    // Dynamic database migration for order cancellation reasons
+    await pool.query(`ALTER TABLE orders ADD COLUMN IF NOT EXISTS cancel_reason TEXT`);
+
     // Seed default categories if empty
     const catCheck = await pool.query("SELECT COUNT(*) as count FROM categories");
     if (parseInt(catCheck.rows[0].count, 10) === 0) {
@@ -540,15 +543,16 @@ class DBHelper {
     return order;
   }
 
-  async updateOrderStatus(id, status) {
+  async updateOrderStatus(id, status, cancelReason = null) {
     if (usePostgres) {
-      const res = await pool.query("UPDATE orders SET status = $1 WHERE id = $2", [status, id]);
+      const res = await pool.query("UPDATE orders SET status = $1, cancel_reason = $2 WHERE id = $3", [status, cancelReason, id]);
       return res.rowCount > 0;
     }
     const orders = await this.getOrders();
     const index = orders.findIndex((o) => o.id === id);
     if (index !== -1) {
       orders[index].status = status;
+      orders[index].cancel_reason = cancelReason;
       await writeJSONFile(ORDERS_FILE, orders);
       return true;
     }
@@ -765,9 +769,24 @@ class Server {
       if (requestUrl === "/api/orders" && req.method === "POST") {
         const body = await getRequestBody(req);
         if (body.action === "updateStatus") {
-          const success = await DB.updateOrderStatus(body.id, body.status);
+          // Validation: If initiated by the user (customer), check order status
+          const orders = await DB.getOrders();
+          const targetOrder = orders.find((o) => o.id === body.id);
+          if (!targetOrder) {
+            res.writeHead(404);
+            res.end(JSON.stringify({ success: false, error: "الطلب غير موجود" }));
+            return;
+          }
+
+          if (body.initiatedByUser && (targetOrder.status === "في الطريق إليك" || targetOrder.status === "تم التوصيل" || targetOrder.status === "ملغي")) {
+            res.writeHead(400);
+            res.end(JSON.stringify({ success: false, error: "لا يمكن إلغاء الطلب بعد خروجه مع المندوب للتوصيل أو تسليمه" }));
+            return;
+          }
+
+          const success = await DB.updateOrderStatus(body.id, body.status, body.cancel_reason || null);
           res.writeHead(success ? 200 : 404);
-          res.end(JSON.stringify({ success }));
+          res.end(JSON.stringify({ success, error: success ? null : "فشل تحديث حالة الطلب" }));
         } else if (body.action === "updatePaymentStatus") {
           let success = false;
           if (usePostgres) {

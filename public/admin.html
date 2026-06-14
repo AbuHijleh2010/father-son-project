@@ -550,6 +550,7 @@ const openOrderDetailsModal = async (orderId) => {
                 <option value="ملغي" ${order.status === "ملغي" ? "selected" : ""}>ملغي ⚠️</option>
               </select>
             </div>
+            ${order.status === "ملغي" ? `<p style="margin-top: 10px; color: #ef4444; background: rgba(239,68,68,0.08); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(239,68,68,0.15); font-size: 0.85rem; margin: 8px 0 0 0;"><strong>سبب الإلغاء/الرفض:</strong> ${order.cancel_reason || "غير محدد"}</p>` : ""}
           </div>
         </div>
       </div>
@@ -589,14 +590,33 @@ const updateOrderStatusModal = async (orderId) => {
   if (!select) return;
   const newStatus = select.value;
 
+  let cancelReason = null;
+  if (newStatus === "ملغي") {
+    cancelReason = prompt("يرجى إدخال سبب إلغاء/رفض هذا الطلب (مثال: عدم توفر المخزون):");
+    if (cancelReason === null) {
+      alert("تم التراجع عن تغيير الحالة.");
+      openOrderDetailsModal(orderId);
+      return;
+    }
+    if (!cancelReason.trim()) {
+      cancelReason = "ملغي من قبل الإدارة";
+    }
+  }
+
   try {
     const res = await fetch("/api/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "updateStatus", id: orderId, status: newStatus })
+      body: JSON.stringify({ 
+        action: "updateStatus", 
+        id: orderId, 
+        status: newStatus,
+        cancel_reason: cancelReason 
+      })
     });
     if (res.ok) {
       showToast(`تم تغيير حالة الطلب بنجاح إلى: ${newStatus}`);
+      openOrderDetailsModal(orderId);
       renderAdminOrders();
     }
   } catch (err) {

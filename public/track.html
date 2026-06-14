@@ -183,40 +183,87 @@ const renderCustomerOrders = async () => {
   const user = getLoggedInUser();
   
   if (!container) return;
-  if (!user) {
+
+  const urlParams = new URLSearchParams(window.location.search);
+  const orderIdFromUrl = urlParams.get('order')?.trim();
+
+  let ordersToRender = [];
+  let isFilteredView = false;
+
+  if (orderIdFromUrl) {
+    const allOrders = await fetchOrders();
+    const specificOrder = allOrders.find(o => o.id === orderIdFromUrl);
+    if (specificOrder) {
+      ordersToRender = [specificOrder];
+      isFilteredView = true;
+    } else {
+      container.innerHTML = `
+        <div class="glass" style="padding: 40px; border-radius: var(--radius-lg); background: rgba(255,255,255,0.05); margin-bottom: 20px;">
+          <h2 style="color: #ef4444;">⚠️ الطلب غير موجود</h2>
+          <p style="color: var(--text-muted); margin: 16px 0 0">
+            لم نتمكن من العثور على طلب بالرقم <strong>${orderIdFromUrl}</strong>. يرجى التأكد من رقم الطلب وحاول مجدداً.
+          </p>
+          <div style="margin-top: 24px;">
+            <a href="track.html" class="hero-btn" style="width: auto; padding: 10px 24px;">العودة لصفحة طلباتي</a>
+          </div>
+        </div>
+      `;
+      return;
+    }
+  } else if (user) {
+    ordersToRender = await fetchOrders(user.username);
+    if (ordersToRender.length === 0) {
+      container.innerHTML = `
+        <div class="glass" style="padding: 40px; border-radius: var(--radius-lg); background: rgba(255,255,255,0.05);">
+          <h2>لم يتم حفظ أي طلب</h2>
+          <p style="color: var(--text-muted); margin: 16px 0 0">
+            لم يتم العثور على أي طلبات على الخادم حالياً.
+          </p>
+          <p style="color: var(--text-muted); margin: 16px 0 0">
+            إذا أكملت الشراء وتريد رؤية الطلب هنا، سجّل الدخول بنفس الحساب الذي استخدمته عند الشراء.
+          </p>
+        </div>
+      `;
+      return;
+    }
+  } else {
     container.innerHTML = `
       <div class="glass" style="padding: 40px; border-radius: var(--radius-lg); background: rgba(255,255,255,0.05);">
         <h2>مرحباً بك!</h2>
         <p style="color: var(--text-muted); margin: 16px 0 0">
-          سجل دخولك لعرض طلباتك السابقة والكتابة دون الحاجة لاستخدام رقم الطلب.
+          سجل دخولك لعرض قائمة طلباتك السابقة، أو تتبع طلبك مباشرة أدناه.
         </p>
         <div style="margin-top: 24px; display:flex; justify-content:center; gap: 12px; flex-wrap: wrap;">
           <a href="login.html" class="hero-btn" style="min-width: 140px">تسجيل دخول</a>
           <a href="signup.html" class="hero-btn" style="min-width: 140px">إنشاء حساب</a>
+        </div>
+        
+        <div style="margin-top: 40px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 30px;">
+          <h3 style="font-size: 1.1rem; margin-bottom: 10px;">🔍 تتبع طلبك مباشرة</h3>
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 20px;">أدخل رقم الطلب (مثال: TRK-1234) الممنوح لك عند الدفع:</p>
+          <div style="display: flex; gap: 10px; max-width: 420px; margin: 0 auto;">
+            <input type="text" id="manualOrderIdInput" class="input-field" placeholder="رقم الطلب (TRK-xxxx)" style="text-align: center; font-weight: bold; letter-spacing: 1px;" />
+            <button class="hero-btn" onclick="searchOrderManually()" style="width: auto; padding: 0 24px;">تتبع</button>
+          </div>
         </div>
       </div>
     `;
     return;
   }
 
-  const userOrders = await fetchOrders(user.username);
-
-  if (userOrders.length === 0) {
-    container.innerHTML = `
-      <div class="glass" style="padding: 40px; border-radius: var(--radius-lg); background: rgba(255,255,255,0.05);">
-        <h2>لم يتم حفظ أي طلب</h2>
-        <p style="color: var(--text-muted); margin: 16px 0 0">
-          لم يتم العثور على أي طلبات على الخادم حالياً.
-        </p>
-        <p style="color: var(--text-muted); margin: 16px 0 0">
-          إذا أكملت الشراء وتريد رؤية الطلب هنا، سجّل الدخول بنفس الحساب الذي استخدمته عند الشراء.
-        </p>
+  let backButtonHTML = "";
+  if (isFilteredView) {
+    backButtonHTML = `
+      <div style="margin-bottom: 20px; text-align: right;">
+        <a href="track.html" class="hero-btn" style="width: auto; padding: 8px 16px; background: rgba(255,255,255,0.06); color: var(--text-main); display: inline-flex; align-items: center; gap: 8px; border: 1px solid rgba(255,255,255,0.1);">
+          <i data-lucide="arrow-right" style="width: 16px;"></i>
+          <span>${user ? "عرض كل طلباتي" : "تتبع طلب آخر"}</span>
+        </a>
       </div>
     `;
-    return;
   }
 
-  container.innerHTML = userOrders
+  container.innerHTML = backButtonHTML + ordersToRender
     .slice()
     .reverse()
     .map(
@@ -230,10 +277,14 @@ const renderCustomerOrders = async () => {
           parsedAddress = { recipient: order.name, city: order.address, area: "", street: "", coordinates: "", notes: "" };
         }
 
+        let cancelMsg = "تنبيه: تم إلغاء هذا الطلب من قبل الإدارة. يرجى التواصل معنا لمزيد من التفاصيل.";
+        if (order.cancel_reason) {
+          cancelMsg = `تنبيه: تم إلغاء هذا الطلب (${order.cancel_reason}).`;
+        }
         const warningBanner = isCancelled 
           ? `<div style="background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.25); color: #ef4444; padding: 14px 18px; border-radius: 12px; margin-bottom: 20px; display: flex; align-items: center; gap: 10px; font-size: 0.95rem; font-weight: 700; text-align: right;">
                <i data-lucide="alert-triangle" style="width: 20px; height: 20px; flex-shrink: 0;"></i>
-               <span>تنبيه: تم إلغاء هذا الطلب من قبل الإدارة. يرجى التواصل معنا لمزيد من التفاصيل.</span>
+               <span>${cancelMsg}</span>
              </div>` 
           : "";
 
@@ -303,6 +354,13 @@ const renderCustomerOrders = async () => {
           <div style="margin-top: 25px; display: grid; gap: 10px;">
             ${isCancelled ? "" : renderOrderSteps(getOrderStep(order.status))}
           </div>
+          ${!isCancelled && order.status !== "في الطريق إليك" && order.status !== "تم التوصيل" ? `
+            <div style="margin-top: 15px; text-align: left;">
+              <button class="hero-btn" style="background: rgba(239, 68, 68, 0.12); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.25); width: auto; padding: 8px 16px; font-size: 0.85rem;" onclick="cancelOrderByCustomer('${order.id}')">
+                ❌ إلغاء الطلب
+              </button>
+            </div>
+          ` : ""}
         </div>
       `;
       }
@@ -316,6 +374,44 @@ document.addEventListener("DOMContentLoaded", () => {
   renderTrackNavActions();
   renderCustomerOrders();
 });
+
+async function cancelOrderByCustomer(orderId) {
+  if (!confirm("هل أنت متأكد من رغبتك في إلغاء هذا الطلب؟")) return;
+  try {
+    const res = await fetch("/api/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "updateStatus",
+        id: orderId,
+        status: "ملغي",
+        cancel_reason: "ملغي من قبل الزبون",
+        initiatedByUser: true
+      })
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      alert("تم إلغاء الطلب بنجاح.");
+      location.reload();
+    } else {
+      alert(data.error || "فشل إلغاء الطلب.");
+    }
+  } catch (err) {
+    console.error("Error cancelling order:", err);
+    alert("حدث خطأ أثناء الاتصال بالخادم.");
+  }
+}
+window.cancelOrderByCustomer = cancelOrderByCustomer;
+
+function searchOrderManually() {
+  const inputVal = document.getElementById("manualOrderIdInput")?.value.trim();
+  if (!inputVal) {
+    alert("الرجاء إدخال رقم الطلب.");
+    return;
+  }
+  window.location.href = `track.html?order=${inputVal}`;
+}
+window.searchOrderManually = searchOrderManually;
 
 // Bind to window for inline events
 window.trackOrder = trackOrder;
