@@ -3,7 +3,7 @@
 :root {
   /* Ultra Premium Palette */
   --bg-main: #020617;
-  --bg-surface: rgba(15, 23, 42, 0.6);
+  --bg-surface: rgba(15, 23, 42, 0.88);
   --bg-surface-light: rgba(30, 41, 59, 0.5);
   
   --primary: #818cf8;
@@ -15,7 +15,7 @@
   --text-muted: #94a3b8;
   --text-dim: #475569;
   
-  --glass: rgba(15, 23, 42, 0.7);
+  --glass: rgba(15, 23, 42, 0.88);
   --glass-border: rgba(255, 255, 255, 0.08);
   
   --radius-sm: 12px;
@@ -23,7 +23,7 @@
   --radius-lg: 40px;
   --radius-full: 9999px;
   
-  --transition: all 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+  --transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 * {
@@ -99,11 +99,14 @@ body {
 /* Glassmorphism */
 .glass {
   background: var(--glass);
+  border: 1px solid var(--glass-border);
+  transform: translateZ(0);
+}
+
+nav.glass {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border);
   will-change: backdrop-filter;
-  transform: translateZ(0);
 }
 
 .auth-page {
@@ -623,7 +626,6 @@ nav.scrolled {
   padding: 30px;
   border-radius: var(--radius-md);
   background: var(--bg-surface);
-  backdrop-filter: blur(20px);
   border: 1px solid var(--glass-border);
   text-align: center;
   cursor: pointer;
@@ -695,7 +697,6 @@ nav.scrolled {
 
 .product-card {
   background: var(--bg-surface);
-  backdrop-filter: blur(20px);
   border-radius: var(--radius-md);
   overflow: hidden;
   transition: var(--transition);
@@ -742,8 +743,7 @@ nav.scrolled {
   position: absolute;
   top: 15px;
   right: 15px;
-  background: rgba(15, 23, 42, 0.7);
-  backdrop-filter: blur(8px);
+  background: rgba(15, 23, 42, 0.9);
   padding: 5px 12px;
   border-radius: 8px;
   font-size: 12px;
@@ -1028,8 +1028,7 @@ th { color: var(--text-muted); }
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0,0,0,0.7);
-    backdrop-filter: blur(10px);
+    background: rgba(2, 6, 23, 0.75);
     z-index: 2000;
     display: none;
     justify-content: flex-end;
