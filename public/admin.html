@@ -470,7 +470,7 @@ const openOrderDetailsModal = async (orderId) => {
             <div style="display: flex; gap: 15px; flex-wrap: wrap; font-size: 0.82rem; color: var(--text-muted);">
               ${item.size ? `<span><strong>المقاس:</strong> ${item.size}</span>` : ""}
               <span><strong>الكمية:</strong> ${item.quantity || 1}</span>
-              <span><strong>سعر القطعة:</strong> ${discount > 0 ? `<span style="text-decoration:line-through; margin-inline-end:5px;">${originalPrice.toFixed(2)}$</span>` : ""}${finalPrice.toFixed(2)}$</span>
+              <span><strong>سعر القطعة:</strong> ${discount > 0 ? `<span style="text-decoration:line-through; margin-inline-end:5px;">${originalPrice.toFixed(2)} ₪</span>` : ""}${finalPrice.toFixed(2)} ₪</span>
             </div>
           </div>
         </div>
@@ -489,15 +489,15 @@ const openOrderDetailsModal = async (orderId) => {
           <div style="margin-top: 20px; background: rgba(255,255,255,0.02); padding: 15px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05);">
             <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
               <span style="color: var(--text-muted); font-size: 0.9rem;">سعر المنتجات:</span>
-              <span style="font-weight: 600;">${(order.total - (order.shipping_cost || 0)).toFixed(2)}$</span>
+              <span style="font-weight: 600;">${(order.total - (order.shipping_cost || 0)).toFixed(2)} ₪</span>
             </div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
               <span style="color: var(--text-muted); font-size: 0.9rem;">تكلفة الشحن:</span>
-              <span style="font-weight: 600;">${(order.shipping_cost || 0).toFixed(2)}$</span>
+              <span style="font-weight: 600;">${(order.shipping_cost || 0).toFixed(2)} ₪</span>
             </div>
             <div style="display: flex; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px; font-weight: 800; font-size: 1.15rem; color: var(--secondary);">
               <span>المجموع الإجمالي:</span>
-              <span>${Number(order.total).toFixed(2)}$</span>
+              <span>${Number(order.total).toFixed(2)} ₪</span>
             </div>
           </div>
         </div>
@@ -832,7 +832,7 @@ const renderAdminProducts = async () => {
             <tr>
                 <td><img src="${p.image || fallbackImage}" width="50" style="border-radius: 5px;" onerror="this.src='${fallbackImage}'"></td>
                 <td>${p.title}</td>
-                <td>${p.price}$</td>
+                <td>${p.price} ₪</td>
                 <td>${p.quantity ?? 0}</td>
                 <td>${p.discount ?? 0}%</td>
                 <td>${p.type === "father" ? "أب" : "طفل"}</td>

@@ -263,8 +263,8 @@ const renderCart = () => {
             <div style="flex: 1">
                 <h4 style="font-size: 0.9rem; margin-bottom: 5px;">${item.title}</h4>
                 <p style="color: var(--secondary); font-weight: 700;">
-                    ${isPromo ? `<span style="text-decoration: line-through; color: var(--text-muted); font-size: 0.8rem; margin-inline-end: 8px;">${Number(item.price).toFixed(2)}$</span>` : ""}
-                    ${Number(finalPrice || 0).toFixed(2)}$
+                    ${isPromo ? `<span style="text-decoration: line-through; color: var(--text-muted); font-size: 0.8rem; margin-inline-end: 8px;">${Number(item.price).toFixed(2)} ₪</span>` : ""}
+                    ${Number(finalPrice || 0).toFixed(2)} ₪
                 </p>
                 ${item.size ? `<p style="font-size: 0.8rem; color: var(--text-muted); margin: 4px 0;">الحجم: ${item.size}</p>` : ""}
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
@@ -296,7 +296,7 @@ const renderCart = () => {
     footer.innerHTML = `
       <div class="total-section">
         <span>المجموع:</span>
-        <span id="cartTotal">${total.toFixed(2)}$</span>
+        <span id="cartTotal">${total.toFixed(2)} ₪</span>
       </div>
       <button class="checkout-btn" onclick="goToCartStep2(event)">
         الانتقال للدفع 💳
@@ -700,12 +700,12 @@ const renderCartStep2 = () => {
     footer.style.display = "block";
     footer.innerHTML = `
       <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px; font-size: 0.95rem; text-align: right;">
-        <div style="display:flex; justify-content:space-between;"><span>سعر المنتجات:</span><span>${subtotal.toFixed(2)}$</span></div>
-        <div style="display:flex; justify-content:space-between;"><span>تكلفة الشحن:</span><span id="shippingDisplay">0.00$</span></div>
+        <div style="display:flex; justify-content:space-between;"><span>سعر المنتجات:</span><span>${subtotal.toFixed(2)} ₪</span></div>
+        <div style="display:flex; justify-content:space-between;"><span>تكلفة الشحن:</span><span id="shippingDisplay">0.00 ₪</span></div>
         <hr style="border-color: var(--glass-border);">
         <div style="display:flex; justify-content:space-between; font-weight: 700; font-size:1.15rem; color: var(--secondary);">
           <span>المجموع الكلي:</span>
-          <span id="grandTotalDisplay">${subtotal.toFixed(2)}$</span>
+          <span id="grandTotalDisplay">${subtotal.toFixed(2)} ₪</span>
         </div>
       </div>
       <button class="checkout-btn" onclick="checkoutCart(event)">
@@ -732,7 +732,7 @@ const goBackToStep1 = () => {
     footer.innerHTML = `
       <div class="total-section">
         <span>المجموع:</span>
-        <span id="cartTotal">0$</span>
+        <span id="cartTotal">0 ₪</span>
       </div>
       <button class="checkout-btn" onclick="goToCartStep2(event)">
         الانتقال للدفع 💳
@@ -756,10 +756,10 @@ const updateShippingFee = () => {
   const grandTotal = subtotal + shippingCost;
 
   const shippingDisplay = document.getElementById("shippingDisplay");
-  if (shippingDisplay) shippingDisplay.innerText = `${shippingCost.toFixed(2)}$`;
+  if (shippingDisplay) shippingDisplay.innerText = `${shippingCost.toFixed(2)} ₪`;
 
   const grandTotalDisplay = document.getElementById("grandTotalDisplay");
-  if (grandTotalDisplay) grandTotalDisplay.innerText = `${grandTotal.toFixed(2)}$`;
+  if (grandTotalDisplay) grandTotalDisplay.innerText = `${grandTotal.toFixed(2)} ₪`;
 };
 // Matching Outfits Popup Modal
 const ensureMatchModalExists = () => {
@@ -808,8 +808,8 @@ const showMatchingSet = async (productId, event) => {
         <img src="${p.image || fallbackImage}" style="width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 12px; margin-bottom: 12px;">
         <h4 style="margin: 0 0 8px; font-size: 0.95rem; color:var(--text-main);">${p.title}</h4>
         <div style="margin-bottom: 12px;">
-          ${isPromo ? `<span style="text-decoration: line-through; color: var(--text-muted); font-size: 0.85rem; margin-inline-end: 8px;">${p.price.toFixed(2)}$</span>` : ""}
-          <span style="color: var(--secondary); font-weight: 700; font-size: 1.1rem;">${finalPrice.toFixed(2)}$</span>
+          ${isPromo ? `<span style="text-decoration: line-through; color: var(--text-muted); font-size: 0.85rem; margin-inline-end: 8px;">${p.price.toFixed(2)} ₪</span>` : ""}
+          <span style="color: var(--secondary); font-weight: 700; font-size: 1.1rem;">${finalPrice.toFixed(2)} ₪</span>
         </div>
         <label style="display: block; text-align: right; margin-bottom: 6px; font-size: 0.85rem; color: var(--text-muted);">المقاس المتاح:</label>
         <select id="${prefix}_size" class="input-field" style="margin: 0 0 10px 0; padding: 8px 12px; font-size: 0.9rem; border-radius: 8px; background: rgba(255,255,255,0.05); width: 100%;">

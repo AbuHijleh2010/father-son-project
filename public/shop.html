@@ -117,7 +117,7 @@
         <div class="cart-footer" id="cartFooter" style="display: none">
           <div class="total-section">
             <span>المجموع:</span>
-            <span id="cartTotal">0$</span>
+            <span id="cartTotal">0 ₪</span>
           </div>
           <button class="checkout-btn" onclick="goToCartStep2(event)">
             الانتقال للدفع 💳
@@ -309,9 +309,9 @@ const renderProductsList = (list) => {
                     <div class="price-wrapper">
                         ${
                           isPromo
-                            ? `<span class="old-price">${product.price.toFixed(2)}$</span>
-                               <span class="price">${finalPrice.toFixed(2)}$</span>`
-                            : `<span class="price">${product.price.toFixed(2)}$</span>`
+                            ? `<span class="old-price">${product.price.toFixed(2)} ₪</span>
+                               <span class="price">${finalPrice.toFixed(2)} ₪</span>`
+                            : `<span class="price">${product.price.toFixed(2)} ₪</span>`
                         }
                     </div>
                     ${
