@@ -53,6 +53,8 @@ body {
   border-radius: 50%;
   z-index: -1;
   animation: blobFloat 20s infinite alternate;
+  will-change: transform;
+  transform: translateZ(0);
 }
 
 .blob-1 { top: -100px; left: -100px; background: rgba(129, 140, 248, 0.15); }
@@ -100,6 +102,8 @@ body {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--glass-border);
+  will-change: backdrop-filter;
+  transform: translateZ(0);
 }
 
 .auth-page {

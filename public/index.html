@@ -173,11 +173,18 @@ const handleCategoryClick = (id) => {
 
 const handleCardGlow = (e) => {
   const card = e.currentTarget;
-  const rect = card.getBoundingClientRect();
+  let rect = card._cachedRect;
+  if (!rect) {
+    rect = card.getBoundingClientRect();
+    card._cachedRect = rect;
+    card.addEventListener("mouseleave", () => {
+      card._cachedRect = null;
+    }, { once: true });
+  }
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
-  card.style.setProperty("--mouse-x", `${x}px`);
-  card.style.setProperty("--mouse-y", `${y}px`);
+  card.style.setProperty("--x", `${x}px`);
+  card.style.setProperty("--y", `${y}px`);
 };
 
 const handleSizeSelect = (productId, size) => {
