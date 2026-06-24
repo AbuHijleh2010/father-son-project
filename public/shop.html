@@ -184,11 +184,10 @@ const findCategoryByQuery = async (query) => {
   return matchingCategory?.id || null;
 };
 
-const searchMatches = async (product, query) => {
+const searchMatches = (product, query, categories) => {
   const normalizedQuery = query.trim().toLowerCase();
   if (!normalizedQuery) return true;
 
-  const categories = await fetchCategories();
   const categoryName =
     categories.find((c) => c.id === product.category_id)?.name || "";
   const fields = [
@@ -199,7 +198,7 @@ const searchMatches = async (product, query) => {
     product.price?.toString(),
   ];
   return fields.some(
-    (field) => field && field.toLowerCase().includes(normalizedQuery),
+    (field) => field && field.toString().toLowerCase().includes(normalizedQuery),
   );
 };
 
@@ -370,14 +369,12 @@ const handleSearchInput = async (val) => {
     return;
   }
 
+  const categories = await fetchCategories();
   const catId = await findCategoryByQuery(query);
-  const filtered = [];
-  for (const p of products) {
-    const isMatch = await searchMatches(p, query);
-    if (isMatch || (catId !== null && p.category_id === catId)) {
-      filtered.push(p);
-    }
-  }
+  const filtered = products.filter(p => {
+    const isMatch = searchMatches(p, query, categories);
+    return isMatch || (catId !== null && p.category_id === catId);
+  });
   renderProductsList(filtered);
 };
 
